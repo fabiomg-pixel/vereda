@@ -57,17 +57,19 @@
   /* HABIT CARD */
   .habits{display:flex;flex-direction:column;gap:11px}
   .habit{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;
-    display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;transition:.25s}
+    display:flex;align-items:flex-start;gap:14px;position:relative;overflow:hidden;transition:.25s}
   .habit.done{background:var(--card2);border-color:var(--moss-d)}
   .habit.skipped{opacity:.6}
   .habit.skipped.done{opacity:.6}
   .habit .accent{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--moss))}
   .check{width:46px;height:46px;border-radius:50%;border:2.5px solid var(--c,var(--moss));flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:.25s;background:transparent}
+    display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:.25s;background:transparent;margin-top:2px}
   .habit.done .check{background:var(--c,var(--moss));border-color:var(--c,var(--moss))}
   .habit.skipped:not(.done) .check{border-style:dashed;border-color:var(--txt3)}
   .check svg{opacity:0;transform:scale(.5);transition:.25s}
   .habit.done .check svg{opacity:1;transform:scale(1)}
+  .check-plus{font-size:22px;color:var(--c,var(--moss));font-weight:300;line-height:1}
+  .habit.done .check-plus,.habit.skipped .check-plus{display:none}
   .h-info{flex:1;min-width:0;cursor:pointer}
   .h-info .icon-name{display:flex;align-items:center;gap:8px}
   .h-emoji{font-size:18px}
@@ -76,7 +78,16 @@
   .h-meta{font-size:12px;color:var(--txt3);margin-top:3px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .h-streak{color:var(--terra);font-weight:600}
   .h-skip{color:var(--gold);font-weight:600}
-  .h-chev{color:var(--txt3);background:none;border:none;font-size:22px;cursor:pointer;padding:6px 10px;flex-shrink:0;line-height:1}
+  .h-chev{color:var(--txt3);background:none;border:none;font-size:22px;cursor:pointer;padding:6px 10px;flex-shrink:0;line-height:1;margin-top:2px}
+
+  /* MEDIA on habit row */
+  .h-media{display:flex;align-items:center;gap:9px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.06)}
+  .h-media-cover{width:30px;height:44px;object-fit:cover;border-radius:3px;background:var(--card2);flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .h-media-cover.empty{display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--txt3)}
+  .h-media-info{flex:1;min-width:0}
+  .h-media-title{font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+  .h-media-author{font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+  .h-media-empty{font-size:12px;color:var(--txt3);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.06)}
 
   .empty{text-align:center;padding:50px 20px;color:var(--txt3)}
   .empty .em{font-size:42px;margin-bottom:12px;opacity:.5}
@@ -93,7 +104,7 @@
     display:none;align-items:flex-end;justify-content:center}
   .overlay.show{display:flex}
   .sheet{background:var(--bg2);border:1px solid var(--line);border-radius:26px 26px 0 0;width:100%;max-width:540px;
-    padding:24px 20px calc(28px + env(safe-area-inset-bottom));animation:up .3s cubic-bezier(.2,.8,.2,1)}
+    padding:24px 20px calc(28px + env(safe-area-inset-bottom));animation:up .3s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow-y:auto}
   @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
   .sheet h3{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin-bottom:18px}
   .sheet h3.action-title{font-size:18px;color:var(--txt2);font-weight:500;margin-bottom:14px}
@@ -102,15 +113,15 @@
   .field input[type=text]{width:100%;background:var(--card);border:1px solid var(--line);border-radius:13px;
     padding:13px 15px;color:var(--txt);font-family:'Hanken Grotesk';font-size:16px}
   .field input:focus{outline:none;border-color:var(--moss)}
-  .emoji-row,.color-row,.freq-row,.dow-row{display:flex;gap:8px;flex-wrap:wrap}
+  .emoji-row,.color-row,.freq-row,.dow-row,.type-row{display:flex;gap:8px;flex-wrap:wrap}
   .emoji-pick{width:44px;height:44px;border-radius:12px;background:var(--card);border:1px solid var(--line);
     font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .emoji-pick.sel{border-color:var(--moss);background:var(--card2)}
   .color-dot{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent}
   .color-dot.sel{border-color:var(--txt)}
-  .freq-pick{flex:1;min-width:60px;background:var(--card);border:1px solid var(--line);color:var(--txt2);
+  .freq-pick,.type-pick{flex:1;min-width:60px;background:var(--card);border:1px solid var(--line);color:var(--txt2);
     padding:11px;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;text-align:center}
-  .freq-pick.sel{background:var(--moss-d);border-color:var(--moss);color:#fff}
+  .freq-pick.sel,.type-pick.sel{background:var(--moss-d);border-color:var(--moss);color:#fff}
   .dow-row{display:flex;gap:5px;margin-top:8px}
   .dow-pick{flex:1;background:var(--card);border:1px solid var(--line);color:var(--txt2);
     padding:10px 0;border-radius:10px;font-weight:600;font-size:12px;cursor:pointer;text-align:center}
@@ -126,6 +137,20 @@
     font-size:15px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px}
   .action-btn .ic{font-size:18px;width:22px;text-align:center;flex-shrink:0}
   .action-btn.danger{color:#e08070}
+  .action-btn.primary{background:var(--moss-d);border-color:var(--moss);color:#fff}
+
+  /* SEARCH MODAL */
+  .search-status{font-size:13px;color:var(--txt3);text-align:center;padding:10px 0;min-height:20px}
+  .search-results{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;margin-bottom:8px;margin-top:4px}
+  .search-result{display:flex;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;align-items:center;transition:.15s}
+  .search-result:active{background:var(--card2);transform:scale(.99)}
+  .search-cover{width:42px;height:60px;object-fit:cover;border-radius:3px;background:var(--card2);flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .search-cover-empty{width:42px;height:60px;background:var(--card2);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:var(--txt3)}
+  .search-info{flex:1;min-width:0}
+  .search-title{font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+  .search-author{font-size:12px;color:var(--txt2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .search-spin{display:inline-block;width:14px;height:14px;border:2px solid var(--txt3);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
   /* STATS VIEW */
   .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:18px}
@@ -134,8 +159,8 @@
   .stat-card span{font-size:12px;color:var(--txt2)}
   .stat-card.accent b{color:var(--terra)}
   .stat-card.moss b{color:var(--moss)}
-  .heatmap-card,.dow-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:18px}
-  .heatmap-card h4,.dow-card h4{font-family:'Fraunces',serif;font-weight:500;font-size:16px;margin-bottom:14px}
+  .heatmap-card,.dow-card,.lib-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:18px}
+  .heatmap-card h4,.dow-card h4,.lib-card h4{font-family:'Fraunces',serif;font-weight:500;font-size:16px;margin-bottom:14px}
   .heat{display:flex;gap:3px;flex-wrap:wrap}
   .heat-cell{width:13px;height:13px;border-radius:3px;background:var(--card2)}
   .heat-legend{display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-top:10px;font-size:11px;color:var(--txt3)}
@@ -159,6 +184,21 @@
   .dow-col.best .dow-label{color:var(--moss)}
   .dow-col.worst .dow-label{color:var(--terra)}
   .dow-caption{font-size:12px;color:var(--txt3);margin-top:8px;line-height:1.5}
+
+  /* LIBRARY (finished) */
+  .lib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+  .lib-item{display:flex;flex-direction:column;gap:5px;cursor:pointer}
+  .lib-item img,.lib-cover-empty{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:5px;background:var(--card2);box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  .lib-cover-empty{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--txt3)}
+  .lib-title{font-size:11px;font-weight:600;color:var(--txt2);text-align:center;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .lib-count{font-size:12px;color:var(--txt3);margin-top:10px;text-align:center}
+
+  /* DETAIL of finished item */
+  .detail-cover{width:120px;aspect-ratio:2/3;object-fit:cover;border-radius:6px;background:var(--card2);box-shadow:0 4px 16px rgba(0,0,0,.5);margin:0 auto 18px;display:block}
+  .detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .detail-row:last-of-type{border-bottom:none}
+  .detail-row .lbl{color:var(--txt3)}
+  .detail-row .val{color:var(--txt);font-weight:600;text-align:right}
 </style>
 </head>
 <body>
@@ -206,6 +246,13 @@
       <input type="text" id="hName" placeholder="ex. Beber 2L de água" maxlength="40">
     </div>
     <div class="field">
+      <label>Tipo</label>
+      <div class="type-row" id="typeRow">
+        <button class="type-pick sel" data-type="simple">Simples</button>
+        <button class="type-pick" data-type="media">📖 Mídia (livro)</button>
+      </div>
+    </div>
+    <div class="field">
       <label>Ícone</label>
       <div class="emoji-row" id="emojiRow"></div>
     </div>
@@ -236,19 +283,42 @@
   </div>
 </div>
 
+<!-- SEARCH BOOK MODAL -->
+<div class="overlay" id="searchOverlay">
+  <div class="sheet">
+    <h3>Buscar livro</h3>
+    <div class="field">
+      <input type="text" id="searchInput" placeholder="Título do livro" autocomplete="off">
+    </div>
+    <div class="search-status" id="searchStatus">Digite o título do livro pra começar.</div>
+    <div class="search-results" id="searchResults"></div>
+    <button class="cancel-btn" id="searchCancelBtn">Cancelar</button>
+  </div>
+</div>
+
+<!-- DETAIL of finished media -->
+<div class="overlay" id="detailOverlay">
+  <div class="sheet" id="detailSheet"></div>
+</div>
+
 <script>
 const EMOJIS=['💧','🏃','📖','🧘','💪','🥗','😴','✍️','🌱','☀️','🦷','💊','🎯','🧠','🎸','🚭'];
 const COLORS=['#7c9a5a','#c8714a','#d4a843','#5b8a8a','#9a6a8a','#6a7a9a','#b85c5c','#7a9a6a'];
 const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const PRESET_DAYS={daily:[0,1,2,3,4,5,6],weekdays:[1,2,3,4,5],'3x':[1,3,5],weekend:[0,6]};
 
-let state=JSON.parse(localStorage.getItem('vereda_v1')||'null')||{habits:[],log:{},skipped:{}};
+let state=JSON.parse(localStorage.getItem('vereda_v1')||'null')||{habits:[],log:{},skipped:{},current:{},finished:[]};
 if(!state.skipped)state.skipped={};
-// migrate legacy habits (freq string only) to days array
-state.habits.forEach(h=>{if(!h.days)h.days=(PRESET_DAYS[h.freq]||[0,1,2,3,4,5,6]).slice()});
+if(!state.current)state.current={};
+if(!state.finished)state.finished=[];
+state.habits.forEach(h=>{
+  if(!h.days)h.days=(PRESET_DAYS[h.freq]||[0,1,2,3,4,5,6]).slice();
+  if(!h.type)h.type='simple';
+});
 function save(){localStorage.setItem('vereda_v1',JSON.stringify(state))}
 save();
 
+const esc=s=>String(s==null?'':s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const todayKey=()=>ymd(new Date());
 
@@ -259,7 +329,6 @@ function isSkipped(id,key){return !!(state.skipped[key]&&state.skipped[key].incl
 function toggle(id){
   const k=todayKey();
   if(!state.log[k])state.log[k]=[];
-  // marking done clears any skip for the same day
   if(isSkipped(id,k))state.skipped[k]=state.skipped[k].filter(x=>x!==id);
   const i=state.log[k].indexOf(id);
   if(i>=0)state.log[k].splice(i,1);else state.log[k].push(id);
@@ -270,14 +339,18 @@ function toggleSkip(id){
   const k=todayKey();
   if(!state.skipped[k])state.skipped[k]=[];
   const i=state.skipped[k].indexOf(id);
-  if(i>=0){
-    state.skipped[k].splice(i,1);
-  }else{
-    state.skipped[k].push(id);
-    if(state.log[k])state.log[k]=state.log[k].filter(x=>x!==id);
-  }
+  if(i>=0){state.skipped[k].splice(i,1);}
+  else{state.skipped[k].push(id);if(state.log[k])state.log[k]=state.log[k].filter(x=>x!==id)}
   save();render();
   if(navigator.vibrate)navigator.vibrate(10);
+}
+// Tap on check: media w/o current → open search; else toggle
+function tapCheck(id){
+  const h=state.habits.find(x=>x.id===id);
+  if(h&&h.type==='media'&&!state.current[id]&&!isDone(id,todayKey())){
+    openSearch(id);return;
+  }
+  toggle(id);
 }
 
 function habitStreak(h){
@@ -285,14 +358,9 @@ function habitStreak(h){
   for(let i=0;i<400;i++){
     const k=ymd(d);
     if(isScheduled(h,d)){
-      if(isSkipped(h.id,k)){
-        // skipped: no count, no break
-      }else if(isDone(h.id,k)){
-        s++;
-      }else if(k!==todayKey()){
-        break; // broke the streak
-      }
-      // else: today pending → neither count nor break
+      if(isSkipped(h.id,k)){}
+      else if(isDone(h.id,k))s++;
+      else if(k!==todayKey())break;
     }
     d.setDate(d.getDate()-1);
   }
@@ -305,7 +373,7 @@ function globalStreak(){
     const sched=state.habits.filter(h=>isScheduled(h,d));
     if(sched.length===0){d.setDate(d.getDate()-1);continue}
     const active=sched.filter(h=>!isSkipped(h.id,k));
-    if(active.length===0){d.setDate(d.getDate()-1);continue} // all skipped → no count, no break
+    if(active.length===0){d.setDate(d.getDate()-1);continue}
     const allDone=active.every(h=>isDone(h.id,k));
     if(allDone)s++;
     else if(k!==todayKey())break;
@@ -320,6 +388,15 @@ function formatDays(days){
   if(days.length===2&&days.includes(0)&&days.includes(6))return 'Fim de semana';
   if(days.length===3&&[1,3,5].every(x=>days.includes(x)))return '3×/sem';
   return days.slice().sort().map(d=>DOW[d]).join(', ');
+}
+
+// Count sessions of a finished entry from the log
+function countSessions(habitId,startDate,endDate){
+  let n=0;
+  Object.keys(state.log).forEach(k=>{
+    if(k>=startDate&&k<=endDate&&state.log[k].includes(habitId))n++;
+  });
+  return n;
 }
 
 let currentView='today';
@@ -357,19 +434,36 @@ function render(){
     const sc=isScheduled(h,d);
     const stk=habitStreak(h);
     const freqLabel=formatDays(h.days);
+    const cur=h.type==='media'?state.current[h.id]:null;
+    let mediaHtml='';
+    if(h.type==='media'){
+      if(cur){
+        mediaHtml=`<div class="h-media">
+          ${cur.cover?`<img class="h-media-cover" src="${esc(cur.cover)}" alt="" onerror="this.outerHTML='<div class=\\'h-media-cover empty\\'>📖</div>'">`:'<div class="h-media-cover empty">📖</div>'}
+          <div class="h-media-info">
+            <div class="h-media-title">${esc(cur.title)}</div>
+            ${cur.author?`<div class="h-media-author">${esc(cur.author)}</div>`:''}
+          </div>
+        </div>`;
+      }else if(currentView==='today'&&sc){
+        mediaHtml='<div class="h-media-empty">Toque ✓ para começar um livro</div>';
+      }
+    }
     return `<div class="habit ${isD?'done':''} ${isS?'skipped':''}" style="--c:${h.color}">
       <div class="accent"></div>
-      <div class="check" onclick="event.stopPropagation();toggle('${h.id}')">
+      <div class="check" onclick="event.stopPropagation();tapCheck('${h.id}')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        ${h.type==='media'&&!cur&&!isD&&!isS?'<span class="check-plus">+</span>':''}
       </div>
       <div class="h-info" onclick="openActions('${h.id}')">
-        <div class="icon-name"><span class="h-emoji">${h.emoji}</span><span class="h-name">${h.name}</span></div>
+        <div class="icon-name"><span class="h-emoji">${esc(h.emoji)}</span><span class="h-name">${esc(h.name)}</span></div>
         <div class="h-meta">
           <span>${freqLabel}</span>
           ${isS?'<span class="h-skip">↷ pulado hoje</span>':''}
           ${stk>0?`<span class="h-streak">🔥 ${stk} dia${stk>1?'s':''}</span>`:''}
           ${currentView==='all'&&!sc?'<span>· hoje não</span>':''}
         </div>
+        ${mediaHtml}
       </div>
       <button class="h-chev" onclick="openActions('${h.id}')" aria-label="Mais ações">›</button>
     </div>`;
@@ -419,7 +513,7 @@ function renderStats(){
   if(validIdx.length>=2){
     maxIdx=validIdx.reduce((a,b)=>b.p>a.p?b:a).i;
     minIdx=validIdx.reduce((a,b)=>b.p<a.p?b:a).i;
-    if(maxIdx===minIdx){minIdx=-1}
+    if(maxIdx===minIdx)minIdx=-1;
   }
   const dowChart=dowPcts.map((p,i)=>{
     if(p===null)return `<div class="dow-col"><div class="dow-bar-v"></div><div class="dow-pct-v">—</div><div class="dow-label">${DOW[i]}</div></div>`;
@@ -450,7 +544,7 @@ function renderStats(){
     }
     const p=t?Math.round(c/t*100):0;
     return `<div class="ph-row">
-      <div class="ph-name"><span>${h.emoji}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.name}</span></div>
+      <div class="ph-name"><span>${esc(h.emoji)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name)}</span></div>
       <div class="ph-bar"><div class="ph-fill" style="width:${p}%;background:${h.color}"></div></div>
       <div class="ph-pct">${p}%</div>
     </div>`;
@@ -461,6 +555,23 @@ function renderStats(){
       <h4>Padrão semanal (90d)</h4>
       <div class="dow-chart">${dowChart}</div>
       ${dowCaption?`<div class="dow-caption">${dowCaption}</div>`:''}
+    </div>`:'';
+
+  // Library: finished items
+  const finished=state.finished.slice().reverse();
+  const libCard=finished.length?`
+    <div class="lib-card">
+      <h4>Biblioteca · lidos</h4>
+      <div class="lib-grid">
+        ${finished.slice(0,12).map((f,i)=>{
+          const realIdx=state.finished.length-1-i;
+          return `<div class="lib-item" onclick="openDetail(${realIdx})">
+            ${f.cover?`<img src="${esc(f.cover)}" alt="" onerror="this.outerHTML='<div class=\\'lib-cover-empty\\'>📖</div>'">`:'<div class="lib-cover-empty">📖</div>'}
+            <div class="lib-title">${esc(f.title)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="lib-count">${finished.length} livro${finished.length>1?'s':''} terminado${finished.length>1?'s':''}${finished.length>12?' · mostrando 12 mais recentes':''}</div>
     </div>`:'';
 
   content.innerHTML=`
@@ -482,6 +593,7 @@ function renderStats(){
       </div>
     </div>
     ${dowCard}
+    ${libCard}
     <div class="per-habit">
       <h4>Desempenho por hábito (30d)</h4>
       ${phRows}
@@ -493,16 +605,18 @@ function delHabit(id){
   state.habits=state.habits.filter(h=>h.id!==id);
   Object.keys(state.log).forEach(k=>{state.log[k]=state.log[k].filter(x=>x!==id)});
   Object.keys(state.skipped).forEach(k=>{state.skipped[k]=state.skipped[k].filter(x=>x!==id)});
+  delete state.current[id];
+  // Note: state.finished entries for this habit are PRESERVED — library is a record of what you read, independent of habit existence
   save();render();
 }
 
 // ADD/EDIT MODAL
-let selEmoji=EMOJIS[0],selColor=COLORS[0],selDays=[0,1,2,3,4,5,6],editingId=null;
+let selEmoji=EMOJIS[0],selColor=COLORS[0],selDays=[0,1,2,3,4,5,6],selType='simple',editingId=null;
 const overlay=document.getElementById('overlay');
 function buildPickers(){
   document.getElementById('emojiRow').innerHTML=EMOJIS.map(e=>`<button class="emoji-pick ${e===selEmoji?'sel':''}" data-e="${e}">${e}</button>`).join('');
   document.getElementById('colorRow').innerHTML=COLORS.map(c=>`<button class="color-dot ${c===selColor?'sel':''}" data-c="${c}" style="background:${c}"></button>`).join('');
-  // mark preset as selected if days match
+  document.querySelectorAll('.type-pick').forEach(b=>b.classList.toggle('sel',b.dataset.type===selType));
   document.querySelectorAll('.freq-pick').forEach(b=>{
     const preset=PRESET_DAYS[b.dataset.preset];
     const match=preset&&preset.length===selDays.length&&preset.every(x=>selDays.includes(x));
@@ -513,18 +627,19 @@ function buildPickers(){
   ).join('');
   document.querySelectorAll('.emoji-pick').forEach(b=>b.onclick=()=>{document.querySelectorAll('.emoji-pick').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');selEmoji=b.dataset.e});
   document.querySelectorAll('.color-dot').forEach(b=>b.onclick=()=>{document.querySelectorAll('.color-dot').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');selColor=b.dataset.c});
+  document.querySelectorAll('.type-pick').forEach(b=>b.onclick=()=>{selType=b.dataset.type;buildPickers()});
   document.querySelectorAll('.freq-pick').forEach(b=>b.onclick=()=>{selDays=PRESET_DAYS[b.dataset.preset].slice();buildPickers()});
   document.querySelectorAll('.dow-pick').forEach(b=>b.onclick=()=>{
     const d=+b.dataset.d;
     if(selDays.includes(d))selDays=selDays.filter(x=>x!==d);
     else selDays=[...selDays,d].sort();
-    if(selDays.length===0)selDays=[d]; // never allow empty
+    if(selDays.length===0)selDays=[d];
     buildPickers();
   });
 }
 function openSheet(){
   editingId=null;
-  selEmoji=EMOJIS[0];selColor=COLORS[0];selDays=[0,1,2,3,4,5,6];
+  selEmoji=EMOJIS[0];selColor=COLORS[0];selDays=[0,1,2,3,4,5,6];selType='simple';
   document.getElementById('sheetTitle').textContent='Novo hábito';
   document.getElementById('saveBtn').textContent='Salvar hábito';
   document.getElementById('hName').value='';
@@ -534,7 +649,7 @@ function openSheet(){
 function editHabit(id){
   const h=state.habits.find(x=>x.id===id);if(!h)return;
   editingId=id;
-  selEmoji=h.emoji;selColor=h.color;selDays=(h.days||[0,1,2,3,4,5,6]).slice();
+  selEmoji=h.emoji;selColor=h.color;selDays=(h.days||[0,1,2,3,4,5,6]).slice();selType=h.type||'simple';
   document.getElementById('sheetTitle').textContent='Editar hábito';
   document.getElementById('saveBtn').textContent='Salvar alterações';
   document.getElementById('hName').value=h.name;
@@ -549,9 +664,15 @@ document.getElementById('saveBtn').onclick=()=>{
   if(!name){document.getElementById('hName').focus();return}
   if(editingId){
     const h=state.habits.find(x=>x.id===editingId);
-    if(h){h.name=name;h.emoji=selEmoji;h.color=selColor;h.days=selDays.slice();delete h.freq}
+    if(h){
+      h.name=name;h.emoji=selEmoji;h.color=selColor;h.days=selDays.slice();h.type=selType;
+      if(selType==='media')h.mediaKind='book';else delete h.mediaKind;
+      delete h.freq;
+    }
   }else{
-    state.habits.push({id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice()});
+    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType};
+    if(selType==='media')habit.mediaKind='book';
+    state.habits.push(habit);
   }
   save();closeSheet();render();
 };
@@ -565,8 +686,18 @@ function openActions(id){
   const k=todayKey();const d=new Date();
   const sc=isScheduled(h,d);
   const sk=isSkipped(id,k);
+  const cur=h.type==='media'?state.current[id]:null;
   document.getElementById('actionTitle').textContent=h.emoji+' '+h.name;
   let html='';
+  if(h.type==='media'){
+    if(cur){
+      html+=`<button class="action-btn primary" data-act="finish"><span class="ic">✓</span>Terminei "${esc(cur.title)}"</button>`;
+      html+=`<button class="action-btn" data-act="swap"><span class="ic">📚</span>Trocar livro</button>`;
+      html+=`<button class="action-btn" data-act="cancel"><span class="ic">⊘</span>Cancelar leitura</button>`;
+    }else{
+      html+=`<button class="action-btn primary" data-act="start"><span class="ic">📖</span>Começar livro</button>`;
+    }
+  }
   if(sc&&!sk)html+=`<button class="action-btn" data-act="skip"><span class="ic">↷</span>Pular hoje</button>`;
   if(sk)html+=`<button class="action-btn" data-act="skip"><span class="ic">↶</span>Desfazer pulo</button>`;
   html+=`<button class="action-btn" data-act="edit"><span class="ic">✎</span>Editar hábito</button>`;
@@ -578,12 +709,136 @@ function openActions(id){
     if(a==='skip')toggleSkip(id);
     else if(a==='edit')editHabit(id);
     else if(a==='delete')delHabit(id);
+    else if(a==='finish')finishMedia(id);
+    else if(a==='swap')openSearch(id);
+    else if(a==='cancel')cancelMedia(id);
+    else if(a==='start')openSearch(id);
   });
   actionOverlay.classList.add('show');
 }
 function closeActions(){actionOverlay.classList.remove('show');actionId=null}
 document.getElementById('actionCancelBtn').onclick=closeActions;
 actionOverlay.onclick=e=>{if(e.target===actionOverlay)closeActions()};
+
+// MEDIA FUNCTIONS
+function finishMedia(id){
+  const cur=state.current[id];if(!cur)return;
+  const endDate=todayKey();
+  const sessions=countSessions(id,cur.startDate||endDate,endDate);
+  state.finished.push({...cur,habitId:id,endDate,sessions});
+  delete state.current[id];
+  save();render();
+  if(navigator.vibrate)navigator.vibrate([15,40,15]);
+}
+function cancelMedia(id){
+  if(!confirm('Cancelar leitura? O histórico de sessões fica, mas o livro sai da tela.'))return;
+  delete state.current[id];save();render();
+}
+
+// SEARCH MODAL
+let searchForHabitId=null,searchDocs=[],searchTimer=null;
+const searchOverlay=document.getElementById('searchOverlay');
+function openSearch(habitId){
+  searchForHabitId=habitId;searchDocs=[];
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchStatus').textContent='Digite o título do livro pra começar.';
+  document.getElementById('searchResults').innerHTML='';
+  searchOverlay.classList.add('show');
+  setTimeout(()=>document.getElementById('searchInput').focus(),300);
+}
+function closeSearch(){searchOverlay.classList.remove('show');searchForHabitId=null;searchDocs=[]}
+document.getElementById('searchCancelBtn').onclick=closeSearch;
+searchOverlay.onclick=e=>{if(e.target===searchOverlay)closeSearch()};
+document.getElementById('searchInput').oninput=e=>{
+  clearTimeout(searchTimer);
+  const q=e.target.value.trim();
+  if(q.length<2){
+    document.getElementById('searchStatus').textContent='Digite ao menos 2 letras.';
+    document.getElementById('searchResults').innerHTML='';return;
+  }
+  searchTimer=setTimeout(()=>doSearch(q),400);
+};
+async function doSearch(query){
+  const statusEl=document.getElementById('searchStatus');
+  const resultsEl=document.getElementById('searchResults');
+  statusEl.innerHTML='<span class="search-spin"></span>Buscando...';
+  resultsEl.innerHTML='';
+  try{
+    const url=`https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&limit=10&fields=key,title,author_name,first_publish_year,cover_i`;
+    const r=await fetch(url);
+    if(!r.ok)throw new Error('http '+r.status);
+    const data=await r.json();
+    const docs=(data.docs||[]).slice(0,10);
+    if(docs.length===0){statusEl.textContent='Nenhum livro encontrado. Tente outro título.';return}
+    statusEl.textContent='';
+    searchDocs=docs;
+    resultsEl.innerHTML=docs.map((d,i)=>{
+      const cover=d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-S.jpg`:'';
+      const author=d.author_name?d.author_name[0]:'';
+      const year=d.first_publish_year||'';
+      const meta=[author,year].filter(Boolean).join(' · ');
+      return `<div class="search-result" data-idx="${i}">
+        ${cover?`<img class="search-cover" src="${cover}" alt="" onerror="this.outerHTML='<div class=\\'search-cover-empty\\'>📖</div>'">`:'<div class="search-cover-empty">📖</div>'}
+        <div class="search-info">
+          <div class="search-title">${esc(d.title||'')}</div>
+          <div class="search-author">${esc(meta)}</div>
+        </div>
+      </div>`;
+    }).join('');
+    document.querySelectorAll('.search-result').forEach(el=>{el.onclick=()=>pickBook(+el.dataset.idx)});
+  }catch(e){
+    statusEl.textContent='Sem conexão com a busca. Tente de novo em instantes.';
+  }
+}
+function pickBook(idx){
+  const doc=searchDocs[idx];if(!doc||!searchForHabitId)return;
+  const habitId=searchForHabitId;
+  const book={
+    mediaId:doc.key||null,
+    title:doc.title||'',
+    author:doc.author_name?doc.author_name[0]:'',
+    year:doc.first_publish_year||null,
+    cover:doc.cover_i?`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`:null,
+    kind:'book',
+    startDate:todayKey()
+  };
+  state.current[habitId]=book;
+  const k=todayKey();
+  if(!state.log[k])state.log[k]=[];
+  if(!state.log[k].includes(habitId))state.log[k].push(habitId);
+  if(state.skipped[k])state.skipped[k]=state.skipped[k].filter(x=>x!==habitId);
+  save();closeSearch();render();
+  if(navigator.vibrate)navigator.vibrate([15,40,15]);
+}
+
+// DETAIL of finished book
+const detailOverlay=document.getElementById('detailOverlay');
+function openDetail(idx){
+  const f=state.finished[idx];if(!f)return;
+  const start=f.startDate?new Date(f.startDate+'T00:00').toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):'—';
+  const end=f.endDate?new Date(f.endDate+'T00:00').toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}):'—';
+  const days=f.startDate&&f.endDate?Math.max(1,Math.round((new Date(f.endDate)-new Date(f.startDate))/86400000)+1):'—';
+  const habit=state.habits.find(h=>h.id===f.habitId);
+  document.getElementById('detailSheet').innerHTML=`
+    <h3>${esc(f.title)}</h3>
+    ${f.cover?`<img class="detail-cover" src="${esc(f.cover)}" alt="" onerror="this.style.display='none'">`:''}
+    <div class="detail-row"><span class="lbl">Autor</span><span class="val">${esc(f.author||'—')}</span></div>
+    ${f.year?`<div class="detail-row"><span class="lbl">Ano</span><span class="val">${f.year}</span></div>`:''}
+    <div class="detail-row"><span class="lbl">Começou</span><span class="val">${start}</span></div>
+    <div class="detail-row"><span class="lbl">Terminou</span><span class="val">${end}</span></div>
+    <div class="detail-row"><span class="lbl">Duração</span><span class="val">${days==='—'?'—':days+' dia'+(days>1?'s':'')}</span></div>
+    <div class="detail-row"><span class="lbl">Sessões</span><span class="val">${f.sessions||0}</span></div>
+    ${habit?`<div class="detail-row"><span class="lbl">Via hábito</span><span class="val">${esc(habit.emoji+' '+habit.name)}</span></div>`:''}
+    <button class="action-btn danger" style="margin-top:14px" onclick="removeFinished(${idx})"><span class="ic">✕</span>Remover da biblioteca</button>
+    <button class="cancel-btn" onclick="closeDetail()">Fechar</button>`;
+  detailOverlay.classList.add('show');
+}
+function closeDetail(){detailOverlay.classList.remove('show')}
+function removeFinished(idx){
+  if(!confirm('Remover esse livro da biblioteca? (não apaga o histórico de hábito)'))return;
+  state.finished.splice(idx,1);save();closeDetail();render();
+}
+detailOverlay.onclick=e=>{if(e.target===detailOverlay)closeDetail()};
 
 // TABS
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
