@@ -997,6 +997,44 @@ async function initAuth(){
   if(loggedIn()){setSyncDot('ok');syncNow(true)}else setSyncDot('off');
 }
 
+/* ---------- PUSH (notificações) ---------- */
+const VAPID_PUBLIC='BOkKqGoSD2nS1KV3aqWnoK-_ljRUBzi35E-HMAuJJ_piNW6YzOxDVvk4dfzJRxwJCZCU6pyChRSWqju2VCIRGBk';
+function urlB64ToUint8(b64){
+  const pad='='.repeat((4-b64.length%4)%4);
+  const base=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base);const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+async function notifStatus(){
+  if(!('Notification'in window)||!('PushManager'in window))return 'unsupported';
+  if(Notification.permission==='denied')return 'denied';
+  if(!loggedIn())return 'needlogin';
+  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();return sub?'on':'off';}
+  catch(e){return 'off'}
+}
+async function enableNotifications(){
+  if(!loggedIn())throw new Error('Entre na sua conta primeiro.');
+  if(!('serviceWorker'in navigator)||!('PushManager'in window))throw new Error('Este navegador não suporta notificações push.');
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted')throw new Error('Permissão negada.');
+  const reg=await navigator.serviceWorker.ready;
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(VAPID_PUBLIC)});
+  const j=sub.toJSON();
+  const tz=(Intl.DateTimeFormat().resolvedOptions().timeZone)||'';
+  const {error}=await sb.from('push_subs').upsert({user_id:sbUser.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,tz},{onConflict:'endpoint'});
+  if(error)throw new Error(error.message);
+  return true;
+}
+async function disableNotifications(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub){if(loggedIn())await sb.from('push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe();}
+  }catch(e){}
+}
+
 /* ---------- BACKUP (export/import) ---------- */
 function exportJSON(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
@@ -1037,6 +1075,7 @@ function renderSettings(){
       <div class="sync-status-line"><span class="sync-dot ok"></span> Conectado como <b>${esc(sbUser.email||'')}</b></div>
       <p class="help">Seus hábitos sincronizam automaticamente em qualquer aparelho onde você entrar com essa conta.</p>
       <button class="action-btn primary" id="btnSyncNow"><span class="ic">⟳</span>Sincronizar agora</button>
+      <button class="action-btn" id="btnNotif"><span class="ic">🔔</span><span id="notifLbl">Ativar notificações neste aparelho</span></button>
       <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
       <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
       <button class="action-btn danger" id="btnSignOut"><span class="ic">⊐</span>Sair da conta</button>
@@ -1068,6 +1107,19 @@ function renderSettings(){
   if($('btnExport'))$('btnExport').onclick=exportJSON;
   if($('btnImport'))$('btnImport').onclick=importJSON;
   if($('btnSyncNow'))$('btnSyncNow').onclick=()=>syncNow(false);
+  if($('btnNotif')){
+    notifStatus().then(s=>{const l=$('notifLbl');if(!l)return;
+      if(s==='on')l.textContent='Notificações ativas neste aparelho ✓';
+      else if(s==='denied')l.textContent='Notificações bloqueadas no navegador';
+      else if(s==='unsupported')l.textContent='Este navegador não suporta push';});
+    $('btnNotif').onclick=async()=>{
+      const s=await notifStatus();
+      if(s==='on'){if(confirm('Desativar notificações neste aparelho?')){await disableNotifications();flashSync('Notificações desativadas.');renderSettings()}return}
+      if(s==='unsupported'){flashSync('Este navegador não suporta notificações push.');return}
+      try{await enableNotifications();flashSync('Notificações ativadas! ✓');renderSettings()}
+      catch(e){flashSync('Falhou: '+e.message)}
+    };
+  }
   if($('btnSignOut'))$('btnSignOut').onclick=async()=>{await doSignOut();renderSettings();flashSync('Você saiu da conta.')};
   if($('btnOpenAuth'))$('btnOpenAuth').onclick=()=>{closeSettings();openAuth()};
   if($('btnSaveCfg'))$('btnSaveCfg').onclick=()=>{

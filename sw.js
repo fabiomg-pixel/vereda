@@ -1,4 +1,4 @@
-const CACHE='vereda-v9';
+const CACHE='vereda-v10';
 const ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./vendor-supabase.js'];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -19,4 +19,39 @@ self.addEventListener('fetch',e=>{
       return resp;
     }).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html')))
   );
+});
+
+// ---- Web Push ----
+self.addEventListener('push',e=>{
+  let d={};
+  try{d=e.data?e.data.json():{}}catch(_){d={title:'Vereda',body:e.data?e.data.text():''}}
+  const title=d.title||'Vereda';
+  const opts={
+    body:d.body||'',
+    icon:'./icon-192.png',
+    badge:'./icon-192.png',
+    tag:d.tag||('vereda-'+(d.habitId||'')+'-'+(d.date||'')),
+    data:d,
+    actions:[{action:'done',title:'✓ Feito'},{action:'skip',title:'Pular'}],
+    requireInteraction:true
+  };
+  e.waitUntil(self.registration.showNotification(title,opts));
+});
+self.addEventListener('notificationclick',e=>{
+  e.notification.close();
+  const d=e.notification.data||{};
+  const action=e.action; // 'done' | 'skip' | '' (toque no corpo)
+  e.waitUntil((async()=>{
+    if((action==='done'||action==='skip')&&d.recordUrl){
+      try{
+        const sub=await self.registration.pushManager.getSubscription();
+        await fetch(d.recordUrl,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({endpoint:sub&&sub.endpoint,habitId:d.habitId,date:d.date,answer:action})});
+        return; // registrado sem abrir o app
+      }catch(err){/* cai pra abrir o app */}
+    }
+    const all=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const c of all){if('focus'in c)return c.focus()}
+    if(self.clients.openWindow)return self.clients.openWindow('./');
+  })());
 });
