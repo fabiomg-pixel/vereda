@@ -110,8 +110,9 @@
   .sheet h3.action-title{font-size:18px;color:var(--txt2);font-weight:500;margin-bottom:14px}
   .field{margin-bottom:16px}
   .field label{display:block;font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
-  .field input[type=text]{width:100%;background:var(--card);border:1px solid var(--line);border-radius:13px;
+  .field input[type=text],.field input[type=time],.field input[type=email],.field input[type=password]{width:100%;background:var(--card);border:1px solid var(--line);border-radius:13px;
     padding:13px 15px;color:var(--txt);font-family:'Hanken Grotesk';font-size:16px}
+  .field input[type=time]{color-scheme:dark}
   .field input:focus{outline:none;border-color:var(--moss)}
   .emoji-row,.color-row,.freq-row,.dow-row,.type-row{display:flex;gap:8px;flex-wrap:wrap}
   .emoji-pick{width:44px;height:44px;border-radius:12px;background:var(--card);border:1px solid var(--line);
@@ -295,6 +296,10 @@
         <button class="freq-pick" data-preset="weekend">Fim de semana</button>
       </div>
       <div class="dow-row" id="dowPickRow"></div>
+    </div>
+    <div class="field">
+      <label>Lembrete (opcional)</label>
+      <input type="time" id="hReminder">
     </div>
     <button class="save-btn" id="saveBtn">Salvar hábito</button>
     <button class="cancel-btn" id="cancelBtn">Cancelar</button>
@@ -514,6 +519,7 @@ function render(){
         <div class="icon-name"><span class="h-emoji">${esc(h.emoji)}</span><span class="h-name">${esc(h.name)}</span></div>
         <div class="h-meta">
           <span>${freqLabel}</span>
+          ${h.reminder?`<span>🔔 ${esc(h.reminder)}</span>`:''}
           ${isS?'<span class="h-skip">↷ pulado hoje</span>':''}
           ${stk>0?`<span class="h-streak">🔥 ${stk} dia${stk>1?'s':''}</span>`:''}
           ${currentView==='all'&&!sc?'<span>· hoje não</span>':''}
@@ -699,6 +705,7 @@ function openSheet(){
   document.getElementById('sheetTitle').textContent='Novo hábito';
   document.getElementById('saveBtn').textContent='Salvar hábito';
   document.getElementById('hName').value='';
+  document.getElementById('hReminder').value='';
   buildPickers();overlay.classList.add('show');
   setTimeout(()=>document.getElementById('hName').focus(),300);
 }
@@ -709,6 +716,7 @@ function editHabit(id){
   document.getElementById('sheetTitle').textContent='Editar hábito';
   document.getElementById('saveBtn').textContent='Salvar alterações';
   document.getElementById('hName').value=h.name;
+  document.getElementById('hReminder').value=h.reminder||'';
   buildPickers();overlay.classList.add('show');
 }
 function closeSheet(){overlay.classList.remove('show');editingId=null}
@@ -718,15 +726,16 @@ overlay.onclick=e=>{if(e.target===overlay)closeSheet()};
 document.getElementById('saveBtn').onclick=()=>{
   const name=document.getElementById('hName').value.trim();
   if(!name){document.getElementById('hName').focus();return}
+  const reminder=document.getElementById('hReminder').value||null;
   if(editingId){
     const h=state.habits.find(x=>x.id===editingId);
     if(h){
-      h.name=name;h.emoji=selEmoji;h.color=selColor;h.days=selDays.slice();h.type=selType;
+      h.name=name;h.emoji=selEmoji;h.color=selColor;h.days=selDays.slice();h.type=selType;h.reminder=reminder;
       if(selType==='media')h.mediaKind='book';else delete h.mediaKind;
       delete h.freq;h.updatedAt=Date.now();
     }
   }else{
-    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType,updatedAt:Date.now()};
+    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType,reminder,updatedAt:Date.now()};
     if(selType==='media')habit.mediaKind='book';
     state.habits.push(habit);
   }
