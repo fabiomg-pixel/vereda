@@ -221,6 +221,8 @@
     background:var(--card2);border:1px solid var(--line);color:var(--txt);padding:12px 18px;border-radius:14px;font-size:14px;
     font-weight:600;box-shadow:var(--shadow);z-index:200;opacity:0;pointer-events:none;transition:.3s;max-width:90vw;text-align:center}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .auth-or{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--txt3);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:var(--line)}
 </style>
 </head>
 <body>
@@ -336,6 +338,8 @@
   <div class="sheet">
     <h3 id="authTitle">Entrar</h3>
     <p class="help" id="authHelp">Crie uma conta ou entre para sincronizar seus hábitos entre aparelhos.</p>
+    <button class="action-btn" id="authGoogle" style="justify-content:center;font-weight:700"><span class="ic">G</span>Continuar com Google</button>
+    <div class="auth-or"><span>ou com email e senha</span></div>
     <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="username" placeholder="voce@email.com"></div>
     <div class="field"><label>Senha</label><input type="password" id="authPass" autocomplete="current-password" placeholder="mínimo 6 caracteres"></div>
     <div class="sync-status-line" id="authStatus"></div>
@@ -1090,6 +1094,15 @@ function renderAuth(){
 }
 document.getElementById('authToggle').onclick=()=>{authMode=authMode==='signin'?'signup':'signin';renderAuth()};
 document.getElementById('authCancel').onclick=closeAuth;
+document.getElementById('authGoogle').onclick=async()=>{
+  const st=document.getElementById('authStatus');
+  if(!initClient()){st.textContent='Servidor não configurado.';return}
+  st.innerHTML='<span class="sync-spin"></span> Redirecionando para o Google...';
+  try{
+    const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
+    if(error)throw new Error(error.message);
+  }catch(e){st.textContent='Falhou: '+e.message}
+};
 document.getElementById('authPrimary').onclick=async()=>{
   const email=document.getElementById('authEmail').value.trim();
   const pass=document.getElementById('authPass').value;
