@@ -349,7 +349,8 @@ state.habits.forEach(h=>{
   if(!h.type)h.type='simple';
   if(h.updatedAt==null)h.updatedAt=0;
 });
-let syncConfig=JSON.parse(localStorage.getItem('vereda_sync')||'null')||{token:'',gistId:'',profile:''};
+let syncConfig=JSON.parse(localStorage.getItem('vereda_sync')||'null')||{token:'',gistId:'',profile:'',proxy:''};
+if(!('proxy' in syncConfig))syncConfig.proxy='';
 function persist(){state.updatedAt=Date.now();localStorage.setItem('vereda_v1',JSON.stringify(state))}
 function saveSync(){localStorage.setItem('vereda_sync',JSON.stringify(syncConfig))}
 function save(){persist();scheduleSync()}
@@ -895,9 +896,10 @@ async function ghFetch(path,opts){
   opts=opts||{};
   const ctrl=new AbortController();
   const to=setTimeout(()=>ctrl.abort(),15000);
+  const base=(syncConfig.proxy&&syncConfig.proxy.replace(/\/+$/,''))||'https://api.github.com';
   let r;
   try{
-    r=await fetch('https://api.github.com'+path,{
+    r=await fetch(base+path,{
       method:opts.method||'GET',
       headers:{'Authorization':'token '+syncConfig.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
       body:opts.body,
@@ -964,16 +966,16 @@ async function syncNow(silent){
   finally{syncing=false}
 }
 function scheduleSync(){if(!syncEnabled())return;setSyncDot('busy');clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(true),2500)}
-async function setupSync(token,profile){
+async function setupSync(token,profile,proxy){
   const prof=(profile||'principal').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'')||'principal';
-  syncConfig={token:token.trim(),profile:prof,gistId:''};
+  syncConfig={token:token.trim(),profile:prof,gistId:'',proxy:(proxy||'').trim().replace(/\/+$/,'')};
   const fname=gistFilename();
   const gists=await ghFetch('/gists?per_page=100');
   const found=gists.find(g=>g.files&&g.files[fname]);
   if(found){syncConfig.gistId=found.id;saveSync();await syncNow(true)}
   else{const created=await ghFetch('/gists',{method:'POST',body:JSON.stringify({description:'Vereda sync — '+prof,public:false,files:{[fname]:{content:JSON.stringify(state)}}})});syncConfig.gistId=created.id;saveSync();setSyncDot('ok')}
 }
-function disableSync(){syncConfig={token:'',gistId:'',profile:''};saveSync();setSyncDot('off')}
+function disableSync(){syncConfig={token:'',gistId:'',profile:'',proxy:syncConfig.proxy||''};saveSync();setSyncDot('off')}
 
 /* ---------- BACKUP (export/import) ---------- */
 function exportJSON(){
@@ -1013,6 +1015,7 @@ function renderSettings(){
     box.innerHTML=`
       <h3>Sincronização</h3>
       <div class="sync-status-line"><span class="sync-dot ok"></span> Ativa · perfil <b>${esc(syncConfig.profile)}</b></div>
+      ${syncConfig.proxy?`<div class="help" style="margin-top:-6px">via proxy: <b>${esc(syncConfig.proxy)}</b></div>`:''}
       <p class="help">Os dados sincronizam sozinhos entre aparelhos com o <b>mesmo perfil e token</b>. Em caso de conflito, "feito" vence sobre "desmarcado".</p>
       <button class="action-btn primary" id="btnSyncNow"><span class="ic">⟳</span>Sincronizar agora</button>
       <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
@@ -1023,9 +1026,10 @@ function renderSettings(){
   }else{
     box.innerHTML=`
       <h3>Sincronizar entre aparelhos</h3>
-      <p class="help">Usa o GitHub que você já tem como nuvem privada. Mesmo perfil + token em cada aparelho = mesmos dados. Nada vai pra mais ninguém.</p>
+      <p class="help">Usa o GitHub que você já tem como nuvem privada. Mesmo perfil + token (+ mesmo proxy) em cada aparelho = mesmos dados. Nada vai pra mais ninguém.</p>
       <div class="field"><label>Nome do perfil</label><input type="text" id="setProfile" placeholder="principal" value="principal" autocomplete="off"></div>
       <div class="field"><label>Token do GitHub (escopo gist)</label><input type="text" id="setToken" placeholder="ghp_..." autocomplete="off"></div>
+      <div class="field"><label>Proxy (cole a URL do seu Deno Deploy)</label><input type="text" id="setProxy" placeholder="https://seu-proxy.deno.dev" autocomplete="off" value="${esc(syncConfig.proxy||'')}"></div>
       <ol class="help steps">
         <li>Toque em <b>Criar token</b> — já abre com o escopo <b>gist</b> marcado.</li>
         <li>Gere, copie e cole o token no campo acima.</li>
@@ -1049,10 +1053,11 @@ function renderSettings(){
   if($('btnOpenTokenPage'))$('btnOpenTokenPage').onclick=()=>window.open('https://github.com/settings/tokens/new?scopes=gist&description=Vereda','_blank');
   if($('btnActivate'))$('btnActivate').onclick=async()=>{
     const token=$('setToken').value.trim();const profile=$('setProfile').value.trim();
+    const proxy=$('setProxy')?$('setProxy').value.trim():'';
     const st=$('setupStatus');
     if(!token){st.textContent='Cole o token primeiro.';return}
     st.innerHTML='<span class="sync-spin"></span> Conectando ao GitHub...';
-    try{await setupSync(token,profile);st.innerHTML='<span class="sync-dot ok"></span> Pronto! Sincronizado.';render();setTimeout(renderSettings,900);}
+    try{await setupSync(token,profile,proxy);st.innerHTML='<span class="sync-dot ok"></span> Pronto! Sincronizado.';render();setTimeout(renderSettings,900);}
     catch(e){st.textContent='Falhou: '+e.message}
   };
 }
