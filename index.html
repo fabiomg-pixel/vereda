@@ -904,8 +904,8 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 
 /* ===================== SYNC (Supabase) ===================== */
-const SUPABASE_URL = localStorage.getItem('vereda_sb_url') || '__SUPABASE_URL__';
-const SUPABASE_ANON = localStorage.getItem('vereda_sb_anon') || '__SUPABASE_ANON__';
+const SUPABASE_URL = localStorage.getItem('vereda_sb_url') || 'https://dripbqcrktimmryvzgwr.supabase.co';
+const SUPABASE_ANON = localStorage.getItem('vereda_sb_anon') || 'sb_publishable_r4YXpVc0dlMhP5nekYzNmg_GY511Lt9';
 let sb=null, sbUser=null, syncTimer=null, syncing=false;
 
 function sbConfigured(){return /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL)&&SUPABASE_ANON.length>20}
