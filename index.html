@@ -893,13 +893,24 @@ function setSyncDot(s){const d=document.getElementById('syncDot');if(d)d.classNa
 function flashSync(msg){const t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),2600)}
 async function ghFetch(path,opts){
   opts=opts||{};
-  const r=await fetch('https://api.github.com'+path,{
-    method:opts.method||'GET',
-    headers:{'Authorization':'token '+syncConfig.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
-    body:opts.body
-  });
+  const ctrl=new AbortController();
+  const to=setTimeout(()=>ctrl.abort(),15000);
+  let r;
+  try{
+    r=await fetch('https://api.github.com'+path,{
+      method:opts.method||'GET',
+      headers:{'Authorization':'token '+syncConfig.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:opts.body,
+      signal:ctrl.signal
+    });
+  }catch(e){
+    clearTimeout(to);
+    if(e&&e.name==='AbortError')throw new Error('Tempo esgotado falando com o GitHub — verifique a conexão e tente de novo.');
+    throw new Error('Sem conexão com o GitHub ('+(e&&e.message?e.message:'rede')+').');
+  }
+  clearTimeout(to);
   if(!r.ok){let t='';try{t=await r.text()}catch(e){}
-    throw new Error((r.status===401?'Token inválido ou sem escopo gist':r.status===403?'Acesso negado / limite':'HTTP '+r.status)+(t?' · '+t.slice(0,90):''));}
+    throw new Error((r.status===401?'Token inválido ou sem escopo gist':r.status===403?'Acesso negado / limite de uso':r.status===404?'Não encontrado':'HTTP '+r.status)+(t?' · '+t.slice(0,90):''));}
   return r.json();
 }
 function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>o[k]=sortKeys(v[k]));return o}return v}
