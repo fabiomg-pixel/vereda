@@ -330,9 +330,25 @@
 <div class="overlay" id="settingsOverlay">
   <div class="sheet" id="settingsSheet"></div>
 </div>
+
+<!-- LOGIN / CADASTRO -->
+<div class="overlay" id="authOverlay">
+  <div class="sheet">
+    <h3 id="authTitle">Entrar</h3>
+    <p class="help" id="authHelp">Crie uma conta ou entre para sincronizar seus hábitos entre aparelhos.</p>
+    <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="username" placeholder="voce@email.com"></div>
+    <div class="field"><label>Senha</label><input type="password" id="authPass" autocomplete="current-password" placeholder="mínimo 6 caracteres"></div>
+    <div class="sync-status-line" id="authStatus"></div>
+    <button class="save-btn" id="authPrimary">Entrar</button>
+    <button class="action-btn" id="authToggle" style="margin-top:8px"><span class="ic">↔</span><span id="authToggleLbl">Não tenho conta — criar</span></button>
+    <button class="cancel-btn" id="authCancel">Cancelar</button>
+  </div>
+</div>
+
 <input type="file" id="fileInput" accept="application/json,.json" style="display:none">
 <div id="toast" class="toast"></div>
 
+<script src="vendor-supabase.js"></script>
 <script>
 const EMOJIS=['💧','🏃','📖','🧘','💪','🥗','😴','✍️','🌱','☀️','🦷','💊','🎯','🧠','🎸','🚭'];
 const COLORS=['#7c9a5a','#c8714a','#d4a843','#5b8a8a','#9a6a8a','#6a7a9a','#b85c5c','#7a9a6a'];
@@ -349,10 +365,7 @@ state.habits.forEach(h=>{
   if(!h.type)h.type='simple';
   if(h.updatedAt==null)h.updatedAt=0;
 });
-let syncConfig=JSON.parse(localStorage.getItem('vereda_sync')||'null')||{token:'',gistId:'',profile:'',proxy:''};
-if(!('proxy' in syncConfig))syncConfig.proxy='';
 function persist(){state.updatedAt=Date.now();localStorage.setItem('vereda_v1',JSON.stringify(state))}
-function saveSync(){localStorage.setItem('vereda_sync',JSON.stringify(syncConfig))}
 function save(){persist();scheduleSync()}
 persist();
 
@@ -886,35 +899,21 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   t.classList.add('active');currentView=t.dataset.view;render();
 });
 
-/* ===================== SYNC (GitHub Gist) ===================== */
-let syncTimer=null,syncing=false;
-function syncEnabled(){return !!(syncConfig.token&&syncConfig.gistId)}
-function gistFilename(){return 'vereda-'+(syncConfig.profile||'principal')+'.json'}
+/* ===================== SYNC (Supabase) ===================== */
+const SUPABASE_URL = localStorage.getItem('vereda_sb_url') || '__SUPABASE_URL__';
+const SUPABASE_ANON = localStorage.getItem('vereda_sb_anon') || '__SUPABASE_ANON__';
+let sb=null, sbUser=null, syncTimer=null, syncing=false;
+
+function sbConfigured(){return /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL)&&SUPABASE_ANON.length>20}
+function initClient(){
+  if(sb)return true;
+  if(sbConfigured()&&window.supabase){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);return true}
+  return false;
+}
+function loggedIn(){return !!(sb&&sbUser)}
 function setSyncDot(s){const d=document.getElementById('syncDot');if(d)d.className='sync-dot '+s}
 function flashSync(msg){const t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),2600)}
-async function ghFetch(path,opts){
-  opts=opts||{};
-  const ctrl=new AbortController();
-  const to=setTimeout(()=>ctrl.abort(),15000);
-  const base=(syncConfig.proxy&&syncConfig.proxy.replace(/\/+$/,''))||'https://api.github.com';
-  let r;
-  try{
-    r=await fetch(base+path,{
-      method:opts.method||'GET',
-      headers:{'Authorization':'token '+syncConfig.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
-      body:opts.body,
-      signal:ctrl.signal
-    });
-  }catch(e){
-    clearTimeout(to);
-    if(e&&e.name==='AbortError')throw new Error('Tempo esgotado falando com o GitHub — verifique a conexão e tente de novo.');
-    throw new Error('Sem conexão com o GitHub ('+(e&&e.message?e.message:'rede')+').');
-  }
-  clearTimeout(to);
-  if(!r.ok){let t='';try{t=await r.text()}catch(e){}
-    throw new Error((r.status===401?'Token inválido ou sem escopo gist':r.status===403?'Acesso negado / limite de uso':r.status===404?'Não encontrado':'HTTP '+r.status)+(t?' · '+t.slice(0,90):''));}
-  return r.json();
-}
+
 function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>o[k]=sortKeys(v[k]));return o}return v}
 function sig(s){const c=JSON.parse(JSON.stringify(s||{}));delete c.updatedAt;return JSON.stringify(sortKeys(c))}
 function mergeStates(a,b){
@@ -940,21 +939,21 @@ function mergeStates(a,b){
   return out;
 }
 async function pullMerge(){
-  const g=await ghFetch('/gists/'+syncConfig.gistId);
-  const f=g.files&&g.files[gistFilename()];
-  if(!f)throw new Error('Perfil não encontrado no gist');
-  let content=f.content;
-  if(f.truncated&&f.raw_url){content=await (await fetch(f.raw_url)).text()}
-  let remote;try{remote=JSON.parse(content)}catch(e){remote={}}
+  const {data,error}=await sb.from('vereda_data').select('data').eq('user_id',sbUser.id).maybeSingle();
+  if(error)throw new Error(error.message);
+  const remote=(data&&data.data)?data.data:{};
   const merged=mergeStates(state,remote);
   const changedLocal=sig(merged)!==sig(state);
   const needPush=sig(merged)!==sig(remote);
   state=merged;persist();
   return {changedLocal,needPush};
 }
-async function pushState(){const files={};files[gistFilename()]={content:JSON.stringify(state)};await ghFetch('/gists/'+syncConfig.gistId,{method:'PATCH',body:JSON.stringify({files})})}
+async function pushState(){
+  const {error}=await sb.from('vereda_data').upsert({user_id:sbUser.id,data:state,updated_at:new Date().toISOString()});
+  if(error)throw new Error(error.message);
+}
 async function syncNow(silent){
-  if(!syncEnabled()||syncing)return;
+  if(!loggedIn()||syncing)return;
   syncing=true;setSyncDot('busy');
   try{
     const r=await pullMerge();
@@ -965,17 +964,34 @@ async function syncNow(silent){
   }catch(e){setSyncDot('err');if(!silent)flashSync('Erro de sync: '+e.message);console.warn('sync',e)}
   finally{syncing=false}
 }
-function scheduleSync(){if(!syncEnabled())return;setSyncDot('busy');clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(true),2500)}
-async function setupSync(token,profile,proxy){
-  const prof=(profile||'principal').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'')||'principal';
-  syncConfig={token:token.trim(),profile:prof,gistId:'',proxy:(proxy||'').trim().replace(/\/+$/,'')};
-  const fname=gistFilename();
-  const gists=await ghFetch('/gists?per_page=100');
-  const found=gists.find(g=>g.files&&g.files[fname]);
-  if(found){syncConfig.gistId=found.id;saveSync();await syncNow(true)}
-  else{const created=await ghFetch('/gists',{method:'POST',body:JSON.stringify({description:'Vereda sync — '+prof,public:false,files:{[fname]:{content:JSON.stringify(state)}}})});syncConfig.gistId=created.id;saveSync();setSyncDot('ok')}
+function scheduleSync(){if(!loggedIn())return;setSyncDot('busy');clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(true),2000)}
+
+async function doSignUp(email,password){
+  const {data,error}=await sb.auth.signUp({email,password});
+  if(error)throw new Error(error.message);
+  if(!data.session)return {needConfirm:true};
+  sbUser=data.user;return {needConfirm:false};
 }
-function disableSync(){syncConfig={token:'',gistId:'',profile:'',proxy:syncConfig.proxy||''};saveSync();setSyncDot('off')}
+async function doSignIn(email,password){
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error)throw new Error(error.message);
+  sbUser=data.user;
+}
+async function doSignOut(){try{await sb.auth.signOut()}catch(e){}sbUser=null;setSyncDot('off')}
+
+async function initAuth(){
+  if(!initClient()){setSyncDot('off');return}
+  try{
+    const {data}=await sb.auth.getSession();
+    sbUser=data.session?data.session.user:null;
+  }catch(e){sbUser=null}
+  sb.auth.onAuthStateChange((ev,session)=>{
+    sbUser=session?session.user:null;
+    if(loggedIn()){setSyncDot('ok')}else{setSyncDot('off')}
+    if(document.getElementById('settingsOverlay').classList.contains('show'))renderSettings();
+  });
+  if(loggedIn()){setSyncDot('ok');syncNow(true)}else setSyncDot('off');
+}
 
 /* ---------- BACKUP (export/import) ---------- */
 function exportJSON(){
@@ -1011,33 +1027,33 @@ settingsOverlay.onclick=e=>{if(e.target===settingsOverlay)closeSettings()};
 document.getElementById('settingsBtn').onclick=openSettings;
 function renderSettings(){
   const box=document.getElementById('settingsSheet');
-  if(syncEnabled()){
+  if(loggedIn()){
     box.innerHTML=`
-      <h3>Sincronização</h3>
-      <div class="sync-status-line"><span class="sync-dot ok"></span> Ativa · perfil <b>${esc(syncConfig.profile)}</b></div>
-      ${syncConfig.proxy?`<div class="help" style="margin-top:-6px">via proxy: <b>${esc(syncConfig.proxy)}</b></div>`:''}
-      <p class="help">Os dados sincronizam sozinhos entre aparelhos com o <b>mesmo perfil e token</b>. Em caso de conflito, "feito" vence sobre "desmarcado".</p>
+      <h3>Conta</h3>
+      <div class="sync-status-line"><span class="sync-dot ok"></span> Conectado como <b>${esc(sbUser.email||'')}</b></div>
+      <p class="help">Seus hábitos sincronizam automaticamente em qualquer aparelho onde você entrar com essa conta.</p>
       <button class="action-btn primary" id="btnSyncNow"><span class="ic">⟳</span>Sincronizar agora</button>
       <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
       <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
-      <button class="action-btn" id="btnRevoke"><span class="ic">↗</span>Gerenciar / revogar tokens</button>
-      <button class="action-btn danger" id="btnDisable"><span class="ic">⊘</span>Desativar sync neste aparelho</button>
+      <button class="action-btn danger" id="btnSignOut"><span class="ic">⊐</span>Sair da conta</button>
+      <button class="cancel-btn" id="btnCloseSettings">Fechar</button>`;
+  }else if(sbConfigured()){
+    box.innerHTML=`
+      <h3>Sincronizar entre aparelhos</h3>
+      <p class="help">Crie uma conta (email + senha) e seus hábitos passam a acompanhar você em qualquer aparelho. Sem conta, o app funciona normalmente só neste aparelho.</p>
+      <button class="save-btn" id="btnOpenAuth">Entrar ou criar conta</button>
+      <hr class="sep">
+      <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
+      <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
       <button class="cancel-btn" id="btnCloseSettings">Fechar</button>`;
   }else{
     box.innerHTML=`
-      <h3>Sincronizar entre aparelhos</h3>
-      <p class="help">Usa o GitHub que você já tem como nuvem privada. Mesmo perfil + token (+ mesmo proxy) em cada aparelho = mesmos dados. Nada vai pra mais ninguém.</p>
-      <div class="field"><label>Nome do perfil</label><input type="text" id="setProfile" placeholder="principal" value="principal" autocomplete="off"></div>
-      <div class="field"><label>Token do GitHub (escopo gist)</label><input type="text" id="setToken" placeholder="ghp_..." autocomplete="off"></div>
-      <div class="field"><label>Proxy (cole a URL do seu Deno Deploy)</label><input type="text" id="setProxy" placeholder="https://seu-proxy.deno.dev" autocomplete="off" value="${esc(syncConfig.proxy||'')}"></div>
-      <ol class="help steps">
-        <li>Toque em <b>Criar token</b> — já abre com o escopo <b>gist</b> marcado.</li>
-        <li>Gere, copie e cole o token no campo acima.</li>
-        <li>No outro aparelho: <b>mesmo perfil + mesmo token</b> → puxa tudo.</li>
-      </ol>
-      <button class="action-btn" id="btnOpenTokenPage"><span class="ic">↗</span>Criar token (escopo gist)</button>
-      <button class="save-btn" id="btnActivate">Ativar sincronização</button>
-      <div class="sync-status-line" id="setupStatus"></div>
+      <h3>Configurar servidor</h3>
+      <p class="help">Configuração única do administrador. Cole a URL e a chave pública (anon) do seu projeto Supabase. Usuários comuns não veem esta tela.</p>
+      <div class="field"><label>Supabase URL</label><input type="text" id="cfgUrl" placeholder="https://xxxx.supabase.co" autocomplete="off"></div>
+      <div class="field"><label>Anon key (pública)</label><input type="text" id="cfgAnon" placeholder="eyJhbGci..." autocomplete="off"></div>
+      <div class="sync-status-line" id="cfgStatus"></div>
+      <button class="save-btn" id="btnSaveCfg">Salvar e conectar</button>
       <hr class="sep">
       <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
       <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
@@ -1048,24 +1064,57 @@ function renderSettings(){
   if($('btnExport'))$('btnExport').onclick=exportJSON;
   if($('btnImport'))$('btnImport').onclick=importJSON;
   if($('btnSyncNow'))$('btnSyncNow').onclick=()=>syncNow(false);
-  if($('btnDisable'))$('btnDisable').onclick=()=>{if(confirm('Desativar sync neste aparelho? Os dados locais continuam; só para de sincronizar.')){disableSync();renderSettings()}};
-  if($('btnRevoke'))$('btnRevoke').onclick=()=>window.open('https://github.com/settings/tokens','_blank');
-  if($('btnOpenTokenPage'))$('btnOpenTokenPage').onclick=()=>window.open('https://github.com/settings/tokens/new?scopes=gist&description=Vereda','_blank');
-  if($('btnActivate'))$('btnActivate').onclick=async()=>{
-    const token=$('setToken').value.trim();const profile=$('setProfile').value.trim();
-    const proxy=$('setProxy')?$('setProxy').value.trim():'';
-    const st=$('setupStatus');
-    if(!token){st.textContent='Cole o token primeiro.';return}
-    st.innerHTML='<span class="sync-spin"></span> Conectando ao GitHub...';
-    try{await setupSync(token,profile,proxy);st.innerHTML='<span class="sync-dot ok"></span> Pronto! Sincronizado.';render();setTimeout(renderSettings,900);}
-    catch(e){st.textContent='Falhou: '+e.message}
+  if($('btnSignOut'))$('btnSignOut').onclick=async()=>{await doSignOut();renderSettings();flashSync('Você saiu da conta.')};
+  if($('btnOpenAuth'))$('btnOpenAuth').onclick=()=>{closeSettings();openAuth()};
+  if($('btnSaveCfg'))$('btnSaveCfg').onclick=()=>{
+    const url=$('cfgUrl').value.trim().replace(/\/+$/,'');const anon=$('cfgAnon').value.trim();
+    const st=$('cfgStatus');
+    if(!/^https:\/\/.+\.supabase\.co/.test(url)||anon.length<20){st.textContent='URL ou chave inválida.';return}
+    localStorage.setItem('vereda_sb_url',url);localStorage.setItem('vereda_sb_anon',anon);
+    st.innerHTML='<span class="sync-dot ok"></span> Salvo. Recarregando...';
+    setTimeout(()=>location.reload(),700);
   };
 }
 
+/* ---------- AUTH MODAL ---------- */
+let authMode='signin';
+const authOverlay=document.getElementById('authOverlay');
+function openAuth(){authMode='signin';renderAuth();authOverlay.classList.add('show');setTimeout(()=>document.getElementById('authEmail').focus(),300)}
+function closeAuth(){authOverlay.classList.remove('show')}
+authOverlay.onclick=e=>{if(e.target===authOverlay)closeAuth()};
+function renderAuth(){
+  document.getElementById('authTitle').textContent=authMode==='signin'?'Entrar':'Criar conta';
+  document.getElementById('authPrimary').textContent=authMode==='signin'?'Entrar':'Criar conta';
+  document.getElementById('authToggleLbl').textContent=authMode==='signin'?'Não tenho conta — criar':'Já tenho conta — entrar';
+  document.getElementById('authStatus').textContent='';
+}
+document.getElementById('authToggle').onclick=()=>{authMode=authMode==='signin'?'signup':'signin';renderAuth()};
+document.getElementById('authCancel').onclick=closeAuth;
+document.getElementById('authPrimary').onclick=async()=>{
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const st=document.getElementById('authStatus');
+  if(!email||!pass){st.textContent='Preencha email e senha.';return}
+  if(pass.length<6){st.textContent='A senha precisa de ao menos 6 caracteres.';return}
+  if(!initClient()){st.textContent='Servidor não configurado.';return}
+  st.innerHTML='<span class="sync-spin"></span> '+(authMode==='signin'?'Entrando...':'Criando conta...');
+  try{
+    if(authMode==='signup'){
+      const r=await doSignUp(email,pass);
+      if(r.needConfirm){st.textContent='Conta criada! Confirme pelo link no seu email e depois entre.';authMode='signin';return}
+    }else{
+      await doSignIn(email,pass);
+    }
+    setSyncDot('ok');closeAuth();
+    await syncNow(false);
+    if(settingsOverlay.classList.contains('show'))renderSettings();
+  }catch(e){st.textContent='Falhou: '+e.message}
+};
+
 render();
-if(syncEnabled()){setSyncDot('ok');syncNow(true)}else setSyncDot('off');
-window.addEventListener('online',()=>{if(syncEnabled())syncNow(true)});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&syncEnabled())syncNow(true)});
+initAuth();
+window.addEventListener('online',()=>{if(loggedIn())syncNow(true)});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&loggedIn())syncNow(true)});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script>
 </body>
