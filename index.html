@@ -199,6 +199,28 @@
   .detail-row:last-of-type{border-bottom:none}
   .detail-row .lbl{color:var(--txt3)}
   .detail-row .val{color:var(--txt);font-weight:600;text-align:right}
+
+  /* HEADER RIGHT + SYNC */
+  .header-right{display:flex;align-items:center;gap:10px}
+  .gear{position:relative;background:var(--card);border:1px solid var(--line);color:var(--txt2);
+    width:40px;height:40px;border-radius:12px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .sync-dot{position:absolute;right:-3px;top:-3px;width:11px;height:11px;border-radius:50%;border:2px solid var(--bg);background:var(--txt3)}
+  .sync-dot.off{background:var(--txt3)}
+  .sync-dot.ok{background:var(--moss)}
+  .sync-dot.busy{background:var(--gold);animation:pulse 1s infinite}
+  .sync-dot.err{background:var(--terra)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .sync-status-line{font-size:14px;color:var(--txt);display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+  .sync-status-line .sync-dot{position:static;border:none;width:10px;height:10px;flex-shrink:0}
+  .help{font-size:13px;color:var(--txt2);line-height:1.55;margin-bottom:14px}
+  .help.steps{padding-left:18px;margin-top:-4px}
+  .help.steps li{margin-bottom:6px}
+  .sep{border:none;border-top:1px solid var(--line);margin:16px 0}
+  .sync-spin{display:inline-block;width:13px;height:13px;border:2px solid var(--txt3);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(96px + env(safe-area-inset-bottom));
+    background:var(--card2);border:1px solid var(--line);color:var(--txt);padding:12px 18px;border-radius:14px;font-size:14px;
+    font-weight:600;box-shadow:var(--shadow);z-index:200;opacity:0;pointer-events:none;transition:.3s;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -208,7 +230,10 @@
       <div class="brand">Vereda<span class="dot">.</span></div>
       <div class="date" id="today"></div>
     </div>
-    <div class="streak-badge">🔥 <span id="globalStreak">0</span><small>SEQUÊNCIA</small></div>
+    <div class="header-right">
+      <button class="gear" id="settingsBtn" aria-label="Configurações">⚙<span class="sync-dot off" id="syncDot"></span></button>
+      <div class="streak-badge">🔥 <span id="globalStreak">0</span><small>SEQUÊNCIA</small></div>
+    </div>
   </header>
 
   <div class="summary">
@@ -301,22 +326,34 @@
   <div class="sheet" id="detailSheet"></div>
 </div>
 
+<!-- SETTINGS / SYNC -->
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet" id="settingsSheet"></div>
+</div>
+<input type="file" id="fileInput" accept="application/json,.json" style="display:none">
+<div id="toast" class="toast"></div>
+
 <script>
 const EMOJIS=['💧','🏃','📖','🧘','💪','🥗','😴','✍️','🌱','☀️','🦷','💊','🎯','🧠','🎸','🚭'];
 const COLORS=['#7c9a5a','#c8714a','#d4a843','#5b8a8a','#9a6a8a','#6a7a9a','#b85c5c','#7a9a6a'];
 const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const PRESET_DAYS={daily:[0,1,2,3,4,5,6],weekdays:[1,2,3,4,5],'3x':[1,3,5],weekend:[0,6]};
 
-let state=JSON.parse(localStorage.getItem('vereda_v1')||'null')||{habits:[],log:{},skipped:{},current:{},finished:[]};
+let state=JSON.parse(localStorage.getItem('vereda_v1')||'null')||{habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},updatedAt:0};
 if(!state.skipped)state.skipped={};
 if(!state.current)state.current={};
 if(!state.finished)state.finished=[];
+if(!state.tombstones)state.tombstones={};
 state.habits.forEach(h=>{
   if(!h.days)h.days=(PRESET_DAYS[h.freq]||[0,1,2,3,4,5,6]).slice();
   if(!h.type)h.type='simple';
+  if(h.updatedAt==null)h.updatedAt=0;
 });
-function save(){localStorage.setItem('vereda_v1',JSON.stringify(state))}
-save();
+let syncConfig=JSON.parse(localStorage.getItem('vereda_sync')||'null')||{token:'',gistId:'',profile:''};
+function persist(){state.updatedAt=Date.now();localStorage.setItem('vereda_v1',JSON.stringify(state))}
+function saveSync(){localStorage.setItem('vereda_sync',JSON.stringify(syncConfig))}
+function save(){persist();scheduleSync()}
+persist();
 
 const esc=s=>String(s==null?'':s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -606,6 +643,7 @@ function delHabit(id){
   Object.keys(state.log).forEach(k=>{state.log[k]=state.log[k].filter(x=>x!==id)});
   Object.keys(state.skipped).forEach(k=>{state.skipped[k]=state.skipped[k].filter(x=>x!==id)});
   delete state.current[id];
+  state.tombstones[id]=Date.now(); // tombstone so deletion propagates across devices
   // Note: state.finished entries for this habit are PRESERVED — library is a record of what you read, independent of habit existence
   save();render();
 }
@@ -667,10 +705,10 @@ document.getElementById('saveBtn').onclick=()=>{
     if(h){
       h.name=name;h.emoji=selEmoji;h.color=selColor;h.days=selDays.slice();h.type=selType;
       if(selType==='media')h.mediaKind='book';else delete h.mediaKind;
-      delete h.freq;
+      delete h.freq;h.updatedAt=Date.now();
     }
   }else{
-    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType};
+    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType,updatedAt:Date.now()};
     if(selType==='media')habit.mediaKind='book';
     state.habits.push(habit);
   }
@@ -800,7 +838,8 @@ function pickBook(idx){
     year:doc.first_publish_year||null,
     cover:doc.cover_i?`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`:null,
     kind:'book',
-    startDate:todayKey()
+    startDate:todayKey(),
+    _ts:Date.now()
   };
   state.current[habitId]=book;
   const k=todayKey();
@@ -846,7 +885,171 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   t.classList.add('active');currentView=t.dataset.view;render();
 });
 
+/* ===================== SYNC (GitHub Gist) ===================== */
+let syncTimer=null,syncing=false;
+function syncEnabled(){return !!(syncConfig.token&&syncConfig.gistId)}
+function gistFilename(){return 'vereda-'+(syncConfig.profile||'principal')+'.json'}
+function setSyncDot(s){const d=document.getElementById('syncDot');if(d)d.className='sync-dot '+s}
+function flashSync(msg){const t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),2600)}
+async function ghFetch(path,opts){
+  opts=opts||{};
+  const r=await fetch('https://api.github.com'+path,{
+    method:opts.method||'GET',
+    headers:{'Authorization':'token '+syncConfig.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+    body:opts.body
+  });
+  if(!r.ok){let t='';try{t=await r.text()}catch(e){}
+    throw new Error((r.status===401?'Token inválido ou sem escopo gist':r.status===403?'Acesso negado / limite':'HTTP '+r.status)+(t?' · '+t.slice(0,90):''));}
+  return r.json();
+}
+function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>o[k]=sortKeys(v[k]));return o}return v}
+function sig(s){const c=JSON.parse(JSON.stringify(s||{}));delete c.updatedAt;return JSON.stringify(sortKeys(c))}
+function mergeStates(a,b){
+  a=a||{};b=b||{};
+  const out={habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},updatedAt:0};
+  const tomb={};
+  [a,b].forEach(s=>{const t=s.tombstones||{};for(const id in t)tomb[id]=Math.max(tomb[id]||0,t[id])});
+  const hmap={};
+  [a,b].forEach(s=>(s.habits||[]).forEach(h=>{const ex=hmap[h.id];if(!ex||(h.updatedAt||0)>(ex.updatedAt||0))hmap[h.id]=h}));
+  for(const id in hmap){const h=hmap[id];if((tomb[id]||0)>(h.updatedAt||0))continue;out.habits.push(h)}
+  out.tombstones=tomb;
+  ['log','skipped'].forEach(key=>{const m={};[a,b].forEach(s=>{const o=s[key]||{};for(const day in o){const set=new Set(m[day]||[]);(o[day]||[]).forEach(x=>set.add(x));m[day]=[...set]}});out[key]=m});
+  const cmap={};
+  [a,b].forEach(s=>{const c=s.current||{};for(const hid in c){const bk=c[hid];const ex=cmap[hid];if(!ex||(bk._ts||0)>(ex._ts||0))cmap[hid]=bk}});
+  out.current=cmap;
+  const fmap={};
+  [a,b].forEach(s=>(s.finished||[]).forEach(f=>{const k=(f.habitId||'')+'|'+(f.mediaId||f.title||'')+'|'+(f.endDate||'');if(!fmap[k])fmap[k]=f}));
+  out.finished=Object.values(fmap);
+  for(const hid in out.current){const c=out.current[hid];
+    const fin=out.finished.some(f=>f.habitId===hid&&((f.mediaId&&c.mediaId)?f.mediaId===c.mediaId:f.title===c.title)&&(!c.startDate||(f.endDate||'')>=c.startDate));
+    if(fin)delete out.current[hid];}
+  out.updatedAt=Math.max(a.updatedAt||0,b.updatedAt||0);
+  return out;
+}
+async function pullMerge(){
+  const g=await ghFetch('/gists/'+syncConfig.gistId);
+  const f=g.files&&g.files[gistFilename()];
+  if(!f)throw new Error('Perfil não encontrado no gist');
+  let content=f.content;
+  if(f.truncated&&f.raw_url){content=await (await fetch(f.raw_url)).text()}
+  let remote;try{remote=JSON.parse(content)}catch(e){remote={}}
+  const merged=mergeStates(state,remote);
+  const changedLocal=sig(merged)!==sig(state);
+  const needPush=sig(merged)!==sig(remote);
+  state=merged;persist();
+  return {changedLocal,needPush};
+}
+async function pushState(){const files={};files[gistFilename()]={content:JSON.stringify(state)};await ghFetch('/gists/'+syncConfig.gistId,{method:'PATCH',body:JSON.stringify({files})})}
+async function syncNow(silent){
+  if(!syncEnabled()||syncing)return;
+  syncing=true;setSyncDot('busy');
+  try{
+    const r=await pullMerge();
+    if(r.needPush)await pushState();
+    setSyncDot('ok');
+    if(r.changedLocal)render();
+    if(!silent)flashSync('Sincronizado.');
+  }catch(e){setSyncDot('err');if(!silent)flashSync('Erro de sync: '+e.message);console.warn('sync',e)}
+  finally{syncing=false}
+}
+function scheduleSync(){if(!syncEnabled())return;setSyncDot('busy');clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(true),2500)}
+async function setupSync(token,profile){
+  const prof=(profile||'principal').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'')||'principal';
+  syncConfig={token:token.trim(),profile:prof,gistId:''};
+  const fname=gistFilename();
+  const gists=await ghFetch('/gists?per_page=100');
+  const found=gists.find(g=>g.files&&g.files[fname]);
+  if(found){syncConfig.gistId=found.id;saveSync();await syncNow(true)}
+  else{const created=await ghFetch('/gists',{method:'POST',body:JSON.stringify({description:'Vereda sync — '+prof,public:false,files:{[fname]:{content:JSON.stringify(state)}}})});syncConfig.gistId=created.id;saveSync();setSyncDot('ok')}
+}
+function disableSync(){syncConfig={token:'',gistId:'',profile:''};saveSync();setSyncDot('off')}
+
+/* ---------- BACKUP (export/import) ---------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='vereda-backup-'+todayKey()+'.json';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  flashSync('Backup exportado.');
+}
+function importJSON(){
+  const inp=document.getElementById('fileInput');inp.value='';
+  inp.onchange=()=>{
+    const file=inp.files&&inp.files[0];if(!file)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const data=JSON.parse(rd.result);
+        if(!data||!Array.isArray(data.habits))throw new Error('Não parece um backup do Vereda');
+        state=mergeStates(state,data);persist();scheduleSync();render();renderSettings();
+        flashSync('Backup importado e mesclado.');
+      }catch(e){flashSync('Falha ao importar: '+e.message)}
+    };
+    rd.readAsText(file);
+  };
+  inp.click();
+}
+
+/* ---------- SETTINGS UI ---------- */
+const settingsOverlay=document.getElementById('settingsOverlay');
+function openSettings(){renderSettings();settingsOverlay.classList.add('show')}
+function closeSettings(){settingsOverlay.classList.remove('show')}
+settingsOverlay.onclick=e=>{if(e.target===settingsOverlay)closeSettings()};
+document.getElementById('settingsBtn').onclick=openSettings;
+function renderSettings(){
+  const box=document.getElementById('settingsSheet');
+  if(syncEnabled()){
+    box.innerHTML=`
+      <h3>Sincronização</h3>
+      <div class="sync-status-line"><span class="sync-dot ok"></span> Ativa · perfil <b>${esc(syncConfig.profile)}</b></div>
+      <p class="help">Os dados sincronizam sozinhos entre aparelhos com o <b>mesmo perfil e token</b>. Em caso de conflito, "feito" vence sobre "desmarcado".</p>
+      <button class="action-btn primary" id="btnSyncNow"><span class="ic">⟳</span>Sincronizar agora</button>
+      <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
+      <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
+      <button class="action-btn" id="btnRevoke"><span class="ic">↗</span>Gerenciar / revogar tokens</button>
+      <button class="action-btn danger" id="btnDisable"><span class="ic">⊘</span>Desativar sync neste aparelho</button>
+      <button class="cancel-btn" id="btnCloseSettings">Fechar</button>`;
+  }else{
+    box.innerHTML=`
+      <h3>Sincronizar entre aparelhos</h3>
+      <p class="help">Usa o GitHub que você já tem como nuvem privada. Mesmo perfil + token em cada aparelho = mesmos dados. Nada vai pra mais ninguém.</p>
+      <div class="field"><label>Nome do perfil</label><input type="text" id="setProfile" placeholder="principal" value="principal" autocomplete="off"></div>
+      <div class="field"><label>Token do GitHub (escopo gist)</label><input type="text" id="setToken" placeholder="ghp_..." autocomplete="off"></div>
+      <ol class="help steps">
+        <li>Toque em <b>Criar token</b> — já abre com o escopo <b>gist</b> marcado.</li>
+        <li>Gere, copie e cole o token no campo acima.</li>
+        <li>No outro aparelho: <b>mesmo perfil + mesmo token</b> → puxa tudo.</li>
+      </ol>
+      <button class="action-btn" id="btnOpenTokenPage"><span class="ic">↗</span>Criar token (escopo gist)</button>
+      <button class="save-btn" id="btnActivate">Ativar sincronização</button>
+      <div class="sync-status-line" id="setupStatus"></div>
+      <hr class="sep">
+      <button class="action-btn" id="btnExport"><span class="ic">⭳</span>Exportar backup (.json)</button>
+      <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
+      <button class="cancel-btn" id="btnCloseSettings">Fechar</button>`;
+  }
+  const $=id=>document.getElementById(id);
+  $('btnCloseSettings').onclick=closeSettings;
+  if($('btnExport'))$('btnExport').onclick=exportJSON;
+  if($('btnImport'))$('btnImport').onclick=importJSON;
+  if($('btnSyncNow'))$('btnSyncNow').onclick=()=>syncNow(false);
+  if($('btnDisable'))$('btnDisable').onclick=()=>{if(confirm('Desativar sync neste aparelho? Os dados locais continuam; só para de sincronizar.')){disableSync();renderSettings()}};
+  if($('btnRevoke'))$('btnRevoke').onclick=()=>window.open('https://github.com/settings/tokens','_blank');
+  if($('btnOpenTokenPage'))$('btnOpenTokenPage').onclick=()=>window.open('https://github.com/settings/tokens/new?scopes=gist&description=Vereda','_blank');
+  if($('btnActivate'))$('btnActivate').onclick=async()=>{
+    const token=$('setToken').value.trim();const profile=$('setProfile').value.trim();
+    const st=$('setupStatus');
+    if(!token){st.textContent='Cole o token primeiro.';return}
+    st.innerHTML='<span class="sync-spin"></span> Conectando ao GitHub...';
+    try{await setupSync(token,profile);st.innerHTML='<span class="sync-dot ok"></span> Pronto! Sincronizado.';render();setTimeout(renderSettings,900);}
+    catch(e){st.textContent='Falhou: '+e.message}
+  };
+}
+
 render();
+if(syncEnabled()){setSyncDot('ok');syncNow(true)}else setSyncDot('off');
+window.addEventListener('online',()=>{if(syncEnabled())syncNow(true)});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&syncEnabled())syncNow(true)});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script>
 </body>
