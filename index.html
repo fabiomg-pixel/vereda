@@ -186,6 +186,25 @@
   .dow-col.worst .dow-label{color:var(--terra)}
   .dow-caption{font-size:12px;color:var(--txt3);margin-top:8px;line-height:1.5}
 
+  /* GAMIFICATION */
+  .level-card{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,var(--card),var(--card2));
+    border:1px solid var(--moss-d);border-radius:18px;padding:16px;margin-bottom:18px;box-shadow:var(--shadow)}
+  .level-emoji{font-size:42px;line-height:1;flex-shrink:0}
+  .level-info{flex:1;min-width:0}
+  .level-name{font-family:'Fraunces',serif;font-weight:600;font-size:19px}
+  .level-xp{font-size:12px;color:var(--txt2);margin:3px 0 9px}
+  .level-bar{height:9px;background:var(--bg2);border-radius:5px;overflow:hidden}
+  .level-fill{height:100%;background:linear-gradient(90deg,var(--moss),var(--gold));border-radius:5px;transition:width .6s}
+  .ach-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:18px}
+  .ach-card h4{font-family:'Fraunces',serif;font-weight:500;font-size:16px;margin-bottom:14px}
+  .ach-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .ach{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 6px;text-align:center;opacity:.4;filter:grayscale(1);transition:.25s}
+  .ach.on{opacity:1;filter:none;border-color:var(--moss-d);background:var(--card2)}
+  .ach-em{font-size:26px;line-height:1}
+  .ach-nm{font-size:12px;font-weight:700;margin-top:6px;line-height:1.2}
+  .ach-ds{font-size:10px;color:var(--txt3);margin-top:2px;line-height:1.3}
+  .ach-pg{font-size:10px;color:var(--moss);font-weight:700;margin-top:4px}
+
   /* LIBRARY (finished) */
   .lib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
   .lib-item{display:flex;flex-direction:column;gap:5px;cursor:pointer}
@@ -475,6 +494,7 @@ function render(){
   document.getElementById('ringFill').style.strokeDashoffset=circ-(circ*pct/100);
   document.getElementById('pctNum').textContent=pct+'%';
   document.getElementById('globalStreak').textContent=globalStreak();
+  gameToasts(computeGame());
   const st=document.getElementById('summaryTitle'),ss=document.getElementById('summarySub');
   if(sched.length===0){st.textContent='Comece o dia';ss.textContent='Adicione seu primeiro hábito.';}
   else if(active.length===0){st.textContent='Dia em pausa';ss.textContent='Todos os hábitos de hoje foram pulados.';}
@@ -529,6 +549,69 @@ function render(){
       <button class="h-chev" onclick="openActions('${h.id}')" aria-label="Mais ações">›</button>
     </div>`;
   }).join('')+'</div>';
+}
+
+/* ---------- GAMIFICAÇÃO (XP, níveis, conquistas) ---------- */
+const LEVELS=[
+  {xp:0,name:'Semente',emoji:'🌱'},
+  {xp:100,name:'Broto',emoji:'🌿'},
+  {xp:300,name:'Muda',emoji:'🪴'},
+  {xp:700,name:'Árvore',emoji:'🌳'},
+  {xp:1500,name:'Bosque',emoji:'🌲'},
+  {xp:3000,name:'Floresta',emoji:'🏞️'},
+];
+function habitCreatedMs(h){const t=parseInt(String(h.id||'').replace(/^h/,''),10);return isNaN(t)?0:t}
+function computeGame(){
+  let totalDone=0;
+  for(const k in state.log)totalDone+=(state.log[k]||[]).length;
+  let best=0,perfect=0;
+  const keys=Object.keys(state.log).concat(Object.keys(state.skipped)).filter(Boolean).sort();
+  if(keys.length){
+    const today=todayKey();let run=0,guard=0;
+    const d=new Date(keys[0]+'T00:00');
+    while(ymd(d)<=today&&guard++<2000){
+      const k=ymd(d);const dayEnd=d.getTime()+86399999;
+      const sched=state.habits.filter(h=>isScheduled(h,d)&&habitCreatedMs(h)<=dayEnd);
+      const active=sched.filter(h=>!isSkipped(h.id,k));
+      if(active.length>0){
+        if(active.every(h=>isDone(h.id,k))){run++;perfect++;if(run>best)best=run}
+        else if(k!==today)run=0;
+      }
+      d.setDate(d.getDate()+1);
+    }
+  }
+  const books=(state.finished||[]).length;
+  const xp=totalDone*10+perfect*25+books*50;
+  let li=0;for(let i=0;i<LEVELS.length;i++)if(xp>=LEVELS[i].xp)li=i;
+  const level=LEVELS[li],next=LEVELS[li+1]||null;
+  const prog=next?(xp-level.xp)/(next.xp-level.xp):1;
+  const A=[
+    {id:'s3',emoji:'🔥',name:'Aquecendo',target:3,value:best,desc:'3 dias seguidos'},
+    {id:'s7',emoji:'🔥',name:'Uma semana',target:7,value:best,desc:'7 dias seguidos'},
+    {id:'s14',emoji:'🔥',name:'Embalado',target:14,value:best,desc:'14 dias seguidos'},
+    {id:'s30',emoji:'🏆',name:'Um mês!',target:30,value:best,desc:'30 dias seguidos'},
+    {id:'s100',emoji:'👑',name:'Centenário',target:100,value:best,desc:'100 dias seguidos'},
+    {id:'c10',emoji:'✅',name:'Primeiros passos',target:10,value:totalDone,desc:'10 concluídos'},
+    {id:'c50',emoji:'✅',name:'Constante',target:50,value:totalDone,desc:'50 concluídos'},
+    {id:'c100',emoji:'💯',name:'Centena',target:100,value:totalDone,desc:'100 concluídos'},
+    {id:'c365',emoji:'🌟',name:'Ano de hábitos',target:365,value:totalDone,desc:'365 concluídos'},
+    {id:'p1',emoji:'🌿',name:'Dia perfeito',target:1,value:perfect,desc:'1 dia 100%'},
+    {id:'p7',emoji:'🌿',name:'Semana perfeita',target:7,value:perfect,desc:'7 dias 100%'},
+    {id:'p30',emoji:'🌳',name:'Impecável',target:30,value:perfect,desc:'30 dias 100%'},
+    {id:'b1',emoji:'📖',name:'Primeira leitura',target:1,value:books,desc:'1 livro lido'},
+    {id:'b5',emoji:'📚',name:'Leitor',target:5,value:books,desc:'5 livros lidos'},
+    {id:'b10',emoji:'📚',name:'Devorador',target:10,value:books,desc:'10 livros lidos'},
+  ];
+  A.forEach(a=>a.unlocked=a.value>=a.target);
+  return {totalDone,perfect,books,best,xp,level,next,prog,achievements:A};
+}
+let _prevAchIds=null,_prevLevelName=null;
+function gameToasts(game){
+  const nowSet=new Set(game.achievements.filter(a=>a.unlocked).map(a=>a.id));
+  if(_prevAchIds===null){_prevAchIds=nowSet;_prevLevelName=game.level.name;return}
+  for(const a of game.achievements)if(a.unlocked&&!_prevAchIds.has(a.id))flashSync('🏅 Conquista: '+a.name+'!');
+  if(game.level.name!==_prevLevelName)flashSync(game.level.emoji+' Subiu de nível: '+game.level.name+'!');
+  _prevAchIds=nowSet;_prevLevelName=game.level.name;
 }
 
 function renderStats(){
@@ -635,13 +718,40 @@ function renderStats(){
       <div class="lib-count">${finished.length} livro${finished.length>1?'s':''} terminado${finished.length>1?'s':''}${finished.length>12?' · mostrando 12 mais recentes':''}</div>
     </div>`:'';
 
+  const game=computeGame();
+  const L=game.level,N=game.next;
+  const levelCard=`
+    <div class="level-card">
+      <div class="level-emoji">${L.emoji}</div>
+      <div class="level-info">
+        <div class="level-name">${esc(L.name)}</div>
+        <div class="level-xp">${game.xp} XP${N?' · faltam '+(N.xp-game.xp)+' pra '+esc(N.name)+' '+N.emoji:' · nível máximo 🎉'}</div>
+        <div class="level-bar"><div class="level-fill" style="width:${Math.round(game.prog*100)}%"></div></div>
+      </div>
+    </div>`;
+  const unlockedCt=game.achievements.filter(a=>a.unlocked).length;
+  const achCard=`
+    <div class="ach-card">
+      <h4>Conquistas · ${unlockedCt}/${game.achievements.length}</h4>
+      <div class="ach-grid">
+        ${game.achievements.map(a=>`<div class="ach ${a.unlocked?'on':''}">
+          <div class="ach-em">${a.emoji}</div>
+          <div class="ach-nm">${esc(a.name)}</div>
+          <div class="ach-ds">${esc(a.desc)}</div>
+          ${a.unlocked?'':`<div class="ach-pg">${Math.min(a.value,a.target)}/${a.target}</div>`}
+        </div>`).join('')}
+      </div>
+    </div>`;
+
   content.innerHTML=`
+    ${levelCard}
     <div class="stats-grid">
       <div class="stat-card moss"><b>${rate}%</b><span>Taxa de conclusão (30d)</span></div>
       <div class="stat-card accent"><b>${gs}</b><span>Sequência atual (dias)</span></div>
       <div class="stat-card"><b>${totalHabits}</b><span>Hábitos ativos</span></div>
       <div class="stat-card"><b>${bestStreak}</b><span>Melhor sequência</span></div>
     </div>
+    ${achCard}
     <div class="heatmap-card">
       <h4>Últimos 90 dias</h4>
       <div class="heat">${heatCells}</div>
