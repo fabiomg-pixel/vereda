@@ -625,6 +625,7 @@ function computeGame(){
     if(ee.mood&&ee.mood.score){checkinParts++;any=true}
     if(ee.sleep&&ee.sleep._ts){checkinParts++;any=true}
     if(ee.diet&&ee.diet.score){checkinParts++;any=true}
+    if(ee.health&&ee.health.score){checkinParts++;any=true}
     if(any)checkinDays++;}
   const xp=totalDone*10+perfect*25+books*50+checkinParts*5;
   let li=0;for(let i=0;i<LEVELS.length;i++)if(xp>=LEVELS[i].xp)li=i;
@@ -821,6 +822,7 @@ function renderStats(){
 /* ---------- BEM-ESTAR (sono / humor / dieta + padrões) ---------- */
 const FACES=['😣','😕','😐','🙂','😄'];
 const DIET_TAGS=['Comi bem','Exagerei','Pulei refeição','Muito açúcar','Álcool','Fora de casa'];
+const HEALTH_TAGS=['Gripe/resfriado','Dor de cabeça','Dor','Cansaço','Indisposição','Alergia','Cólica','Estômago'];
 function ensureDaily(date){if(!state.daily[date])state.daily[date]={};return state.daily[date]}
 function setSleepQuality(q){const e=ensureDaily(todayKey());e.sleep=Object.assign({quality:0,hours:7.5},e.sleep,{quality:q,_ts:Date.now()});save();renderWellbeing()}
 function setSleepHours(delta){const e=ensureDaily(todayKey());const base=(e.sleep&&e.sleep.hours!=null)?e.sleep.hours:7.5;const h=Math.max(0,Math.min(14,Math.round((base+delta)*2)/2));e.sleep=Object.assign({quality:0,hours:7.5},e.sleep,{hours:h,_ts:Date.now()});save();renderWellbeing()}
@@ -829,6 +831,9 @@ function setMoodNote(v){const e=ensureDaily(todayKey());e.mood=Object.assign({sc
 function setDiet(s){const e=ensureDaily(todayKey());e.diet=Object.assign({score:0,tags:[],note:''},e.diet,{score:s,_ts:Date.now()});save();renderWellbeing()}
 function setDietNote(v){const e=ensureDaily(todayKey());e.diet=Object.assign({score:0,tags:[],note:''},e.diet,{note:v,_ts:Date.now()});save()}
 function toggleDietTag(t){const e=ensureDaily(todayKey());const d=Object.assign({score:0,tags:[],note:''},e.diet);d.tags=(d.tags||[]).slice();const i=d.tags.indexOf(t);if(i>=0)d.tags.splice(i,1);else d.tags.push(t);d._ts=Date.now();e.diet=d;save();renderWellbeing()}
+function setHealth(s){const e=ensureDaily(todayKey());e.health=Object.assign({score:0,tags:[],note:''},e.health,{score:s,_ts:Date.now()});save();renderWellbeing()}
+function setHealthNote(v){const e=ensureDaily(todayKey());e.health=Object.assign({score:0,tags:[],note:''},e.health,{note:v,_ts:Date.now()});save()}
+function toggleHealthTag(t){const e=ensureDaily(todayKey());const d=Object.assign({score:0,tags:[],note:''},e.health);d.tags=(d.tags||[]).slice();const i=d.tags.indexOf(t);if(i>=0)d.tags.splice(i,1);else d.tags.push(t);d._ts=Date.now();e.health=d;save();renderWellbeing()}
 function faceRow(cur,fn){return FACES.map((f,i)=>`<button class="face ${cur===i+1?'sel':''}" onclick="${fn}(${i+1})">${f}</button>`).join('')}
 
 function dayCompletionPct(date){
@@ -848,6 +853,7 @@ function computeWellbeing(){
   const moodAvg30=avg(days.filter(d=>recent(d)&&daily[d].mood&&daily[d].mood.score).map(d=>daily[d].mood.score));
   const sleepHrs30=avg(days.filter(d=>recent(d)&&daily[d].sleep&&daily[d].sleep._ts&&daily[d].sleep.hours!=null).map(d=>daily[d].sleep.hours));
   const sleepQ30=avg(days.filter(d=>recent(d)&&daily[d].sleep&&daily[d].sleep.quality).map(d=>daily[d].sleep.quality));
+  const healthAvg30=avg(days.filter(d=>recent(d)&&daily[d].health&&daily[d].health.score).map(d=>daily[d].health.score));
   const moodWhere=pred=>{const xs=moodDays.filter(pred).map(d=>daily[d].mood.score);return {avg:avg(xs),n:xs.length}};
   const corr={
     sleepGood:moodWhere(d=>daily[d].sleep&&daily[d].sleep.quality>=4),
@@ -856,9 +862,16 @@ function computeWellbeing(){
     habitLow:moodWhere(d=>{const p=dayCompletionPct(d);return p!==null&&p<0.7}),
     dietGood:moodWhere(d=>daily[d].diet&&daily[d].diet.score>=4),
     dietBad:moodWhere(d=>daily[d].diet&&daily[d].diet.score&&daily[d].diet.score<=2),
+    healthGood:moodWhere(d=>daily[d].health&&daily[d].health.score>=4),
+    healthBad:moodWhere(d=>daily[d].health&&daily[d].health.score&&daily[d].health.score<=2),
   };
+  // Saúde × cumprimento de hábitos (mesmo dia)
+  const compHealthy=[],compSick=[];
+  for(const d of days){const hh=daily[d].health;if(!hh||!hh.score)continue;const p=dayCompletionPct(d);if(p===null)continue;
+    if(hh.score>=4)compHealthy.push(p);else if(hh.score<=2)compSick.push(p);}
+  const complByHealth={healthy:{avg:avg(compHealthy),n:compHealthy.length},sick:{avg:avg(compSick),n:compSick.length}};
   const trend=[];for(let i=20;i>=0;i--){const dt=new Date();dt.setDate(dt.getDate()-i);const k=ymd(dt);trend.push(daily[k]&&daily[k].mood?daily[k].mood.score:null)}
-  return {daysLogged:days.length,moodCount:moodDays.length,moodAvg30,sleepHrs30,sleepQ30,corr,trend};
+  return {daysLogged:days.length,moodCount:moodDays.length,moodAvg30,sleepHrs30,sleepQ30,healthAvg30,corr,complByHealth,trend};
 }
 function corrCard(title,goodLabel,good,badLabel,bad){
   if(!good||!bad||good.n<2||bad.n<2)
@@ -927,7 +940,7 @@ function habitCorrCard(h){
 }
 function renderWellbeing(){
   const date=todayKey();const e=state.daily[date]||{};
-  const sleep=e.sleep||{},mood=e.mood||{},diet=e.diet||{};
+  const sleep=e.sleep||{},mood=e.mood||{},diet=e.diet||{},health=e.health||{};
   const hrs=(sleep._ts&&sleep.hours!=null)?sleep.hours:7.5;
   const wb=computeWellbeing();
   const checkin=`
@@ -952,6 +965,12 @@ function renderWellbeing(){
       <div class="face-row">${faceRow(diet.score||0,'setDiet')}</div>
       <div class="tag-row">${DIET_TAGS.map(t=>`<button class="tag ${(diet.tags||[]).includes(t)?'sel':''}" onclick="toggleDietTag('${t}')">${t}</button>`).join('')}</div>
       <input type="text" class="wb-note" placeholder="Observação (opcional)" value="${esc(diet.note||'')}" oninput="setDietNote(this.value)" maxlength="140">
+    </div>
+    <div class="wb-card">
+      <div class="wb-head">🩹 Saúde <small>física hoje</small></div>
+      <div class="face-row">${faceRow(health.score||0,'setHealth')}</div>
+      <div class="tag-row">${HEALTH_TAGS.map(t=>`<button class="tag ${(health.tags||[]).includes(t)?'sel':''}" onclick="toggleHealthTag('${t}')">${t}</button>`).join('')}</div>
+      <input type="text" class="wb-note" placeholder="Sintoma ou observação (opcional)" value="${esc(health.note||'')}" oninput="setHealthNote(this.value)" maxlength="140">
     </div>`;
   const fmt=v=>v==null?'—':v.toFixed(1);
   let patterns;
@@ -962,6 +981,16 @@ function renderWellbeing(){
     const chips=state.habits.map(h=>`<button class="tag ${selIds.includes(h.id)?'sel':''}" onclick="toggleWbHabit('${h.id}')">${esc(h.emoji)} ${esc(h.name)}</button>`).join('');
     const selHabits=state.habits.filter(h=>selIds.includes(h.id));
     const habitCards=state.habits.length?(selHabits.length?selHabits.map(habitCorrCard).join(''):'<div class="wb-corr-insuf">Selecione um hábito acima.</div>'):'<div class="wb-corr-insuf">Crie hábitos pra cruzar com humor e sono.</div>';
+    const ch=wb.complByHealth;
+    const healthComplCard=(ch.healthy.avg!=null&&ch.sick.avg!=null&&ch.healthy.n>=2&&ch.sick.n>=2)?`
+      <div class="wb-corr">
+        <div class="wb-corr-t">Saúde × cumprimento de hábitos</div>
+        <div class="wb-corr-rows">
+          <div><span>Bem de saúde (${ch.healthy.n})</span><b>${Math.round(ch.healthy.avg*100)}%</b></div>
+          <div><span>Adoentado (${ch.sick.n})</span><b>${Math.round(ch.sick.avg*100)}%</b></div>
+        </div>
+        <div class="wb-corr-note">${ch.healthy.avg-ch.sick.avg>=0.1?'Você cumpre mais hábitos quando está bem de saúde':ch.sick.avg-ch.healthy.avg>=0.1?'Você cumpre mais hábitos quando adoentado (incomum)':'Sem diferença marcante'}</div>
+      </div>`:`<div class="wb-corr"><div class="wb-corr-t">Saúde × cumprimento de hábitos</div><div class="wb-corr-insuf">Poucos dados ainda pra comparar.</div></div>`;
     patterns=`
       <div class="wb-section-title">Padrões</div>
       <div class="wb-avg">
@@ -972,6 +1001,8 @@ function renderWellbeing(){
       ${corrCard('Humor × Sono','Dormiu bem',wb.corr.sleepGood,'Dormiu mal',wb.corr.sleepBad)}
       ${corrCard('Humor × Hábitos','Hábitos em dia',wb.corr.habitHigh,'Hábitos atrasados',wb.corr.habitLow)}
       ${corrCard('Humor × Alimentação','Comeu bem',wb.corr.dietGood,'Comeu mal',wb.corr.dietBad)}
+      ${corrCard('Humor × Saúde','Bem de saúde',wb.corr.healthGood,'Adoentado',wb.corr.healthBad)}
+      ${healthComplCard}
       <div class="wb-card">
         <div class="wb-corr-t">Humor — últimos 21 dias</div>
         <div class="wb-trend">${wb.trend.map(s=>`<div class="wb-tbar" style="height:${s?Math.round(s/5*100):6}%;opacity:${s?1:.2}"></div>`).join('')}</div>
@@ -1272,7 +1303,7 @@ function mergeStates(a,b){
     const fin=out.finished.some(f=>f.habitId===hid&&((f.mediaId&&c.mediaId)?f.mediaId===c.mediaId:f.title===c.title)&&(!c.startDate||(f.endDate||'')>=c.startDate));
     if(fin)delete out.current[hid];}
   [a,b].forEach(s=>{const dd=s.daily||{};for(const dt in dd){const e=dd[dt]||{};const cur=out.daily[dt]||(out.daily[dt]={});
-    ['sleep','mood','diet'].forEach(tk=>{const v=e[tk];if(v&&(!cur[tk]||(v._ts||0)>(cur[tk]._ts||0)))cur[tk]=v})}});
+    ['sleep','mood','diet','health'].forEach(tk=>{const v=e[tk];if(v&&(!cur[tk]||(v._ts||0)>(cur[tk]._ts||0)))cur[tk]=v})}});
   out.updatedAt=Math.max(a.updatedAt||0,b.updatedAt||0);
   return out;
 }
