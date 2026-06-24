@@ -211,6 +211,19 @@
   .ach-nm{font-size:12px;font-weight:700;margin-top:6px;line-height:1.2}
   .ach-ds{font-size:10px;color:var(--txt3);margin-top:2px;line-height:1.3}
   .ach-pg{font-size:10px;color:var(--moss);font-weight:700;margin-top:4px}
+  .ev-list{display:flex;flex-direction:column;gap:8px}
+  .ev-row{display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:9px 12px;border-left-width:3px}
+  .ev-row.good{border-left-color:var(--moss)}
+  .ev-row.bad{border-left-color:var(--terra)}
+  .ev-em{font-size:22px;line-height:1;flex-shrink:0}
+  .ev-info{flex:1;min-width:0}
+  .ev-nm{font-size:13px;font-weight:700;line-height:1.2}
+  .ev-ds{font-size:10.5px;color:var(--txt3);margin-top:1px}
+  .ev-dt{font-size:11px;color:var(--txt2);font-weight:600;flex-shrink:0}
+  .theme-seg{display:flex;gap:8px;margin:4px 0 6px}
+  .theme-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px 8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--txt);transition:.15s}
+  .theme-opt.sel{border-color:var(--moss);background:var(--card2)}
+  .theme-opt .te{font-size:19px}
 
   /* BEM-ESTAR */
   .wb-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:13px}
@@ -446,6 +459,8 @@ if(!state.current)state.current={};
 if(!state.finished)state.finished=[];
 if(!state.tombstones)state.tombstones={};
 if(!state.daily)state.daily={};
+if(!state.events)state.events={};
+if(!state.theme)state.theme='jardim';
 state.habits.forEach(h=>{
   if(!h.days)h.days=(PRESET_DAYS[h.freq]||[0,1,2,3,4,5,6]).slice();
   if(!h.type)h.type='simple';
@@ -552,7 +567,7 @@ function render(){
   document.getElementById('ringFill').style.strokeDashoffset=circ-(circ*pct/100);
   document.getElementById('pctNum').textContent=pct+'%';
   document.getElementById('globalStreak').textContent=globalStreak();
-  gameToasts(computeGame());
+  const _g=computeGame();gameToasts(_g);commitGameEvents(_g);
   const st=document.getElementById('summaryTitle'),ss=document.getElementById('summarySub');
   if(sched.length===0){st.textContent='Comece o dia';ss.textContent='Adicione seu primeiro hábito.';}
   else if(active.length===0){st.textContent='Dia em pausa';ss.textContent='Todos os hábitos de hoje foram pulados.';}
@@ -611,14 +626,42 @@ function render(){
 }
 
 /* ---------- GAMIFICAÇÃO (XP, níveis, conquistas) ---------- */
-const LEVELS=[
-  {xp:0,name:'Semente',emoji:'🌱'},
-  {xp:100,name:'Broto',emoji:'🌿'},
-  {xp:300,name:'Muda',emoji:'🪴'},
-  {xp:700,name:'Árvore',emoji:'🌳'},
-  {xp:1500,name:'Bosque',emoji:'🌲'},
-  {xp:3000,name:'Floresta',emoji:'🏞️'},
-];
+const THEMES={
+  jardim:{
+    label:'Jardim',emoji:'🌳',
+    levels:[
+      {xp:0,name:'Semente',emoji:'🌱'},
+      {xp:100,name:'Broto',emoji:'🌿'},
+      {xp:300,name:'Muda',emoji:'🪴'},
+      {xp:700,name:'Árvore',emoji:'🌳'},
+      {xp:1500,name:'Bosque',emoji:'🌲'},
+      {xp:3000,name:'Floresta',emoji:'🏞️'},
+    ],
+    conds:[{emoji:'🍂',label:'Folhas amarelando'},{emoji:'🥀',label:'Secando'},{emoji:'🍃',label:'Perdendo folhas'},{emoji:'🐛',label:'Praga atacando'}],
+    bloom:{emoji:'🌸',word:'Florescimento',note:'temperatura perfeita'},
+    grant:{emoji:'🌦️',label:'Estação fértil',desc:'semana de bem-estar alto'},
+    revive:'Cumpra um hábito hoje pra reviver.',
+    legend:'💧 rega +10 · 🌱 adubação (dia 100%) +25 · 🌸 temperatura perfeita +15/dia · 🍐 polinização (livro) +50 · ☀️ check-in +5 · 🌦️ estação fértil (bem-estar) +15/dia'
+  },
+  lab:{
+    label:'Laboratório',emoji:'🔬',
+    levels:[
+      {xp:0,name:'Iniciação científica',emoji:'🔬'},
+      {xp:100,name:'Mestrado',emoji:'🧫'},
+      {xp:300,name:'Doutorado',emoji:'🧪'},
+      {xp:700,name:'Pós-doc',emoji:'🔭'},
+      {xp:1500,name:'Pesquisador (PI)',emoji:'🧑‍🔬'},
+      {xp:3000,name:'Professor titular',emoji:'🎓'},
+    ],
+    conds:[{emoji:'🧫',label:'Cultura contaminada'},{emoji:'⚗️',label:'Reagente vencido'},{emoji:'⚙️',label:'Equipamento quebrado'},{emoji:'📕',label:'Artigo retratado'}],
+    bloom:{emoji:'🚀',word:'Maré de resultados',note:'resultados reproduzindo'},
+    grant:{emoji:'💰',label:'Grant aprovado',desc:'semana de bem-estar alto'},
+    revive:'Rode um experimento hoje pra retomar.',
+    legend:'🧪 ensaio +10 · ✅ réplica (dia 100%) +25 · 📈 reprodução +15/dia · 📄 artigo (livro) +50 · 📓 caderno +5 · 💰 grant (bem-estar) +15/dia'
+  }
+};
+function TH(){return THEMES[state.theme]||THEMES.jardim}
+function condIdx(n){return n<=4?0:n<=7?1:n<=14?2:3}
 function habitCreatedMs(h){const t=parseInt(String(h.id||'').replace(/^h/,''),10);return isNaN(t)?0:t}
 function computeGame(){
   let totalDone=0;
@@ -640,14 +683,15 @@ function computeGame(){
     }
   }
   const books=(state.finished||[]).length;
-  let checkinDays=0,checkinParts=0;
+  let checkinDays=0,checkinParts=0,wellBonusDays=0;
   for(const dt in (state.daily||{})){const ee=state.daily[dt];let any=false;
     if(ee.mood&&ee.mood.score){checkinParts++;any=true}
     if(ee.sleep&&ee.sleep._ts){checkinParts++;any=true}
     if(ee.diet&&ee.diet.score){checkinParts++;any=true}
     if(ee.health&&ee.health.score){checkinParts++;any=true}
-    if(any)checkinDays++;}
-  const baseXp=totalDone*10+perfect*25+bloomDays*15+books*50+checkinParts*5;
+    if(any)checkinDays++;
+    if(ee.mood&&ee.mood.score>=4&&ee.sleep&&ee.sleep.quality>=4)wellBonusDays++;}
+  const baseXp=totalDone*10+perfect*25+bloomDays*15+books*50+checkinParts*5+wellBonusDays*15;
   // Decaimento: a planta murcha após dias parado (com obrigação e nada feito), fora da tolerância.
   // Recuperável: cumprir um hábito hoje zera o desconto.
   const dayInfo=(date,dd)=>{const sched=state.habits.filter(h=>isScheduled(h,dd)&&habitCreatedMs(h)<=dd.getTime()+86399999);const active=sched.filter(h=>!isSkipped(h.id,date));return {has:active.length>0,done:active.some(h=>isDone(h.id,date))}};
@@ -662,14 +706,16 @@ function computeGame(){
   const GRACE=2,DECAY=15;
   const penalty=Math.max(0,(inactive-GRACE))*DECAY;
   const xp=Math.max(0,baseXp-penalty);
-  let condition=null;
+  let condition=null,condTier=-1;
   if(inactive>GRACE){
-    condition=inactive<=4?{emoji:'🍂',label:'Folhas amarelando'}:inactive<=7?{emoji:'🥀',label:'Secando'}:inactive<=14?{emoji:'🍃',label:'Perdendo folhas'}:{emoji:'🐛',label:'Praga atacando'};
+    condTier=condIdx(inactive);
+    condition=TH().conds[condTier];
   }
   const curPerfect=globalStreak();
   const blooming=penalty===0&&curPerfect>=3;
-  let li=0;for(let i=0;i<LEVELS.length;i++)if(xp>=LEVELS[i].xp)li=i;
-  const level=LEVELS[li],next=LEVELS[li+1]||null;
+  const LV=TH().levels;
+  let li=0;for(let i=0;i<LV.length;i++)if(xp>=LV[i].xp)li=i;
+  const level=LV[li],next=LV[li+1]||null;
   const prog=next?(xp-level.xp)/(next.xp-level.xp):1;
   const A=[
     {id:'s3',emoji:'🔥',name:'Aquecendo',target:3,value:best,desc:'3 dias seguidos'},
@@ -691,19 +737,45 @@ function computeGame(){
     {id:'wb30',emoji:'📔',name:'Autoconhecimento',target:30,value:checkinDays,desc:'30 dias de check-in'},
   ];
   A.forEach(a=>a.unlocked=a.value>=a.target);
-  return {totalDone,perfect,books,best,xp,baseXp,penalty,inactive,bloomDays,condition,blooming,curPerfect,level,next,prog,achievements:A};
+  return {totalDone,perfect,books,best,xp,baseXp,penalty,inactive,bloomDays,wellBonusDays,condition,condTier,blooming,curPerfect,level,next,prog,achievements:A};
 }
-let _prevAchIds=null,_prevLevelName=null,_prevXp=0,_prevBlooming=false;
+let _prevAchIds=null,_prevLevelName=null,_prevXp=0,_prevBlooming=false,_prevTheme=null;
 function gameToasts(game){
   const nowSet=new Set(game.achievements.filter(a=>a.unlocked).map(a=>a.id));
-  if(_prevAchIds===null){_prevAchIds=nowSet;_prevLevelName=game.level.name;_prevXp=game.xp;_prevBlooming=game.blooming;return}
+  const themeChanged=_prevTheme!==null&&_prevTheme!==state.theme;
+  if(_prevAchIds===null||themeChanged){_prevAchIds=nowSet;_prevLevelName=game.level.name;_prevXp=game.xp;_prevBlooming=game.blooming;_prevTheme=state.theme;return}
   for(const a of game.achievements)if(a.unlocked&&!_prevAchIds.has(a.id))flashSync('🏅 Conquista: '+a.name+'!');
   if(game.level.name!==_prevLevelName){
     if(game.xp>=_prevXp)flashSync(game.level.emoji+' Subiu de nível: '+game.level.name+'!');
-    else flashSync('🍂 Murchou para '+game.level.name+'. Cumpra um hábito pra reviver.');
+    else flashSync(TH().conds[3].emoji+' Recuou para '+game.level.name+'. '+TH().revive);
   }
-  if(game.blooming&&!_prevBlooming)flashSync('🌸 Florescimento! Temperatura perfeita — '+game.curPerfect+' dias 100%.');
-  _prevAchIds=nowSet;_prevLevelName=game.level.name;_prevXp=game.xp;_prevBlooming=game.blooming;
+  if(game.blooming&&!_prevBlooming)flashSync(TH().bloom.emoji+' '+TH().bloom.word+'! '+game.curPerfect+' dias 100% seguidos.');
+  _prevAchIds=nowSet;_prevLevelName=game.level.name;_prevXp=game.xp;_prevBlooming=game.blooming;_prevTheme=state.theme;
+}
+function isoWeekKey(d){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=(dt.getUTCDay()+6)%7;dt.setUTCDate(dt.getUTCDate()-day+3);
+  const firstThu=new Date(Date.UTC(dt.getUTCFullYear(),0,4));
+  const fday=(firstThu.getUTCDay()+6)%7;firstThu.setUTCDate(firstThu.getUTCDate()-fday+3);
+  const week=1+Math.round((dt-firstThu)/(7*86400000));
+  return dt.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
+}
+// Grava eventos marcantes: 💰 grant (semana de bem-estar alto) e o pior revés do episódio de inatividade.
+function commitGameEvents(game){
+  let changed=false;const ev=state.events||(state.events={});const today=todayKey();
+  let good7=0;const dd=new Date();
+  for(let i=0;i<7;i++){const k=ymd(dd);const e=state.daily[k];if(e&&e.mood&&e.mood.score>=4&&e.sleep&&e.sleep.quality>=4)good7++;dd.setDate(dd.getDate()-1)}
+  if(good7>=5){const gk='grant|'+isoWeekKey(new Date());if(!ev[gk]){ev[gk]={k:'grant',date:today,ts:Date.now()};changed=true}}
+  if(game.condTier>=2){
+    const start=new Date();start.setDate(start.getDate()-1);let walked=0,startKey=today,guard=0;
+    while(guard++<400&&walked<game.inactive){const k=ymd(start);
+      const sched=state.habits.filter(h=>isScheduled(h,start)&&habitCreatedMs(h)<=start.getTime()+86399999);
+      if(sched.filter(h=>!isSkipped(h.id,k)).length>0){startKey=k;walked++}
+      start.setDate(start.getDate()-1);}
+    const ik='inc|'+startKey+'|'+game.condTier;
+    if(!ev[ik]){ev[ik]={k:'incident',tier:game.condTier,date:today,ts:Date.now()};changed=true}
+  }
+  if(changed)save();
 }
 
 function renderStats(){
@@ -812,12 +884,12 @@ function renderStats(){
 
   const game=computeGame();
   const L=game.level,N=game.next;
-  const cond=game.condition,blooming=game.blooming;
-  const mainEmoji=cond?cond.emoji:L.emoji;
-  const mod=cond?` <small style="color:var(--terra);font-weight:600">· ${cond.label.toLowerCase()}</small>`:(blooming?' <small style="color:var(--gold);font-weight:600">· florescendo 🌸</small>':'');
+  const cond=game.condition,blooming=game.blooming,BL=TH().bloom;
+  const mainEmoji=cond?cond.emoji:(blooming?BL.emoji:L.emoji);
+  const mod=cond?` <small style="color:var(--terra);font-weight:600">· ${cond.label.toLowerCase()}</small>`:(blooming?` <small style="color:var(--gold);font-weight:600">· ${BL.word.toLowerCase()} ${BL.emoji}</small>`:'');
   const status=cond
-    ?`<div class="level-wilt">${cond.emoji} ${cond.label} — parado há ${game.inactive} dias · −${game.penalty} XP. Cumpra um hábito hoje pra reviver.</div>`
-    :(blooming?`<div class="level-wilt bloom-note">🌸 Florescendo — ${game.curPerfect} dias 100% seguidos (temperatura perfeita, +${game.bloomDays>0?'bônus':''} XP).</div>`:'');
+    ?`<div class="level-wilt">${cond.emoji} ${cond.label} — parado há ${game.inactive} dias · −${game.penalty} XP. ${TH().revive}</div>`
+    :(blooming?`<div class="level-wilt bloom-note">${BL.emoji} ${BL.word} — ${game.curPerfect} dias 100% seguidos (${BL.note}, +bônus XP).</div>`:'');
   const levelCard=`
     <div class="level-card ${cond?'wilting':''} ${blooming?'blooming':''}">
       <div class="level-emoji">${mainEmoji}</div>
@@ -828,7 +900,25 @@ function renderStats(){
         ${status}
       </div>
     </div>
-    <div class="level-legend">💧 rega +10 · 🌱 adubação (dia 100%) +25 · 🌸 temperatura perfeita +15/dia · 🍐 polinização (livro) +50 · ☀️ check-in +5</div>`;
+    <div class="level-legend">${TH().legend}</div>`;
+  // Linha do tempo de eventos marcantes (grants e reveses)
+  const evList=Object.values(state.events||{}).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,8);
+  const evCard=evList.length?`
+    <div class="ach-card">
+      <h4>Linha do tempo</h4>
+      <div class="ev-list">
+        ${evList.map(e=>{
+          const good=e.k==='grant';
+          const g=TH().grant,c=TH().conds[e.tier!=null?e.tier:3];
+          const emoji=good?g.emoji:c.emoji,label=good?g.label:c.label,sub=good?g.desc:'parado tempo demais';
+          return `<div class="ev-row ${good?'good':'bad'}">
+            <div class="ev-em">${emoji}</div>
+            <div class="ev-info"><div class="ev-nm">${esc(label)}</div><div class="ev-ds">${esc(sub)}</div></div>
+            <div class="ev-dt">${esc((e.date||'').slice(5))}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`:'';
   const unlockedCt=game.achievements.filter(a=>a.unlocked).length;
   const achCard=`
     <div class="ach-card">
@@ -852,6 +942,7 @@ function renderStats(){
       <div class="stat-card"><b>${bestStreak}</b><span>Melhor sequência</span></div>
     </div>
     ${achCard}
+    ${evCard}
     <div class="heatmap-card">
       <h4>Últimos 90 dias</h4>
       <div class="heat">${heatCells}</div>
@@ -1394,7 +1485,7 @@ function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==
 function sig(s){const c=JSON.parse(JSON.stringify(s||{}));delete c.updatedAt;return JSON.stringify(sortKeys(c))}
 function mergeStates(a,b){
   a=a||{};b=b||{};
-  const out={habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},daily:{},updatedAt:0};
+  const out={habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},daily:{},events:{},theme:'jardim',_themeTs:0,updatedAt:0};
   const tomb={};
   [a,b].forEach(s=>{const t=s.tombstones||{};for(const id in t)tomb[id]=Math.max(tomb[id]||0,t[id])});
   const hmap={};
@@ -1413,6 +1504,10 @@ function mergeStates(a,b){
     if(fin)delete out.current[hid];}
   [a,b].forEach(s=>{const dd=s.daily||{};for(const dt in dd){const e=dd[dt]||{};const cur=out.daily[dt]||(out.daily[dt]={});
     ['sleep','mood','diet','health'].forEach(tk=>{const v=e[tk];if(v&&(!cur[tk]||(v._ts||0)>(cur[tk]._ts||0)))cur[tk]=v})}});
+  [a,b].forEach(s=>{const ee=s.events||{};for(const k in ee)if(!out.events[k])out.events[k]=ee[k]});
+  const at=a._themeTs||0,bt=b._themeTs||0;
+  out._themeTs=Math.max(at,bt);
+  out.theme=(at>=bt?(a.theme||b.theme):(b.theme||a.theme))||'jardim';
   out.updatedAt=Math.max(a.updatedAt||0,b.updatedAt||0);
   return out;
 }
@@ -1576,7 +1671,20 @@ function renderSettings(){
       <button class="action-btn" id="btnImport"><span class="ic">⭱</span>Importar backup (.json)</button>
       <button class="cancel-btn" id="btnCloseSettings">Fechar</button>`;
   }
+  const t=state.theme||'jardim';
+  box.insertAdjacentHTML('afterbegin',`
+    <h3>Tema da jornada</h3>
+    <div class="theme-seg">
+      <div class="theme-opt ${t==='jardim'?'sel':''}" data-theme="jardim"><span class="te">🌳</span>Jardim</div>
+      <div class="theme-opt ${t==='lab'?'sel':''}" data-theme="lab"><span class="te">🔬</span>Laboratório</div>
+    </div>
+    <p class="help">Muda a pele da gamificação (níveis, bônus e reveses). Seu progresso e XP continuam os mesmos nos dois.</p>
+    <hr class="sep">`);
   const $=id=>document.getElementById(id);
+  box.querySelectorAll('.theme-opt').forEach(el=>el.onclick=()=>{
+    const nt=el.dataset.theme;if(nt===state.theme)return;
+    state.theme=nt;state._themeTs=Date.now();save();renderSettings();render();
+  });
   $('btnCloseSettings').onclick=closeSettings;
   if($('btnExport'))$('btnExport').onclick=exportJSON;
   if($('btnImport'))$('btnImport').onclick=importJSON;
