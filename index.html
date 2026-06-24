@@ -233,6 +233,13 @@
   .wb-trend{display:flex;gap:3px;align-items:flex-end;height:70px;margin-top:8px}
   .wb-tbar{flex:1;background:var(--moss);border-radius:3px;min-height:3px}
   .wb-empty{text-align:center;color:var(--txt3);font-size:14px;padding:24px 16px;line-height:1.7}
+  .hw-line{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--txt2);padding:5px 0}
+  .hw-line b{color:var(--txt)}
+  .hw-vals{font-size:12px}
+  .hw-arrow{font-weight:700;margin-left:5px}
+  .hw-arrow.up{color:var(--moss)}
+  .hw-arrow.down{color:var(--terra)}
+  .hw-insuf{color:var(--txt3)}
 
   /* LIBRARY (finished) */
   .lib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
@@ -867,6 +874,57 @@ function corrCard(title,goodLabel,good,badLabel,bad){
     <div class="wb-corr-note">${note}</div>
   </div>`;
 }
+function wbSelectedIds(){
+  let sel=null;try{sel=JSON.parse(localStorage.getItem('vereda_wb_sel')||'null')}catch(e){}
+  if(!Array.isArray(sel))return state.habits.map(h=>h.id);
+  return sel;
+}
+function toggleWbHabit(id){
+  const sel=wbSelectedIds().slice();const i=sel.indexOf(id);
+  if(i>=0)sel.splice(i,1);else sel.push(id);
+  localStorage.setItem('vereda_wb_sel',JSON.stringify(sel));renderWellbeing();
+}
+function habitWellbeingCorr(habitId){
+  const daily=state.daily||{};const h=state.habits.find(x=>x.id===habitId);
+  const moodDone=[],moodNot=[],sleepDone=[],sleepNot=[];
+  if(h){
+    const keys=Object.keys(daily).concat(Object.keys(state.log||{})).filter(Boolean).sort();
+    if(keys.length){
+      const today=todayKey();let guard=0;const d=new Date(keys[0]+'T00:00');
+      while(ymd(d)<=today&&guard++<2000){
+        const date=ymd(d);
+        if(isScheduled(h,d)&&habitCreatedMs(h)<=d.getTime()+86399999&&!isSkipped(habitId,date)){
+          const done=isDone(habitId,date);
+          const e=daily[date];
+          if(e&&e.mood&&e.mood.score)(done?moodDone:moodNot).push(e.mood.score);
+          const ne=daily[ymd(new Date(d.getTime()+86400000))];
+          if(ne&&ne.sleep&&ne.sleep.quality)(done?sleepDone:sleepNot).push(ne.sleep.quality);
+        }
+        d.setDate(d.getDate()+1);
+      }
+    }
+  }
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  return {mood:{done:{avg:avg(moodDone),n:moodDone.length},not:{avg:avg(moodNot),n:moodNot.length}},
+          sleep:{done:{avg:avg(sleepDone),n:sleepDone.length},not:{avg:avg(sleepNot),n:sleepNot.length}}};
+}
+function habitCorrCard(h){
+  const c=habitWellbeingCorr(h.id);
+  const part=(label,obj)=>{
+    if(obj.done.avg==null||obj.not.avg==null||obj.done.n<2||obj.not.n<2)
+      return `<div class="hw-line hw-insuf"><span>${label}</span><span>poucos dados</span></div>`;
+    const diff=obj.done.avg-obj.not.avg;
+    const cls=diff>=0.3?'up':diff<=-0.3?'down':'';
+    const arrow=diff>=0.3?'↑':diff<=-0.3?'↓':'→';
+    return `<div class="hw-line"><span>${label}</span>
+      <span class="hw-vals">com <b>${obj.done.avg.toFixed(1)}</b> · sem <b>${obj.not.avg.toFixed(1)}</b> <span class="hw-arrow ${cls}">${arrow}</span></span></div>`;
+  };
+  return `<div class="wb-corr">
+    <div class="wb-corr-t">${esc(h.emoji)} ${esc(h.name)}</div>
+    ${part('Humor (mesmo dia)',c.mood)}
+    ${part('Sono (noite seguinte)',c.sleep)}
+  </div>`;
+}
 function renderWellbeing(){
   const date=todayKey();const e=state.daily[date]||{};
   const sleep=e.sleep||{},mood=e.mood||{},diet=e.diet||{};
@@ -895,11 +953,15 @@ function renderWellbeing(){
       <div class="tag-row">${DIET_TAGS.map(t=>`<button class="tag ${(diet.tags||[]).includes(t)?'sel':''}" onclick="toggleDietTag('${t}')">${t}</button>`).join('')}</div>
       <input type="text" class="wb-note" placeholder="Observação (opcional)" value="${esc(diet.note||'')}" oninput="setDietNote(this.value)" maxlength="140">
     </div>`;
+  const fmt=v=>v==null?'—':v.toFixed(1);
   let patterns;
-  if(wb.moodCount<4){
-    patterns=`<div class="wb-section-title">Padrões</div><div class="wb-empty">Registre seu humor por alguns dias e os padrões aparecem aqui.<br>(${wb.moodCount} ${wb.moodCount===1?'dia registrado':'dias registrados'})</div>`;
+  if(wb.daysLogged<4){
+    patterns=`<div class="wb-section-title">Padrões</div><div class="wb-empty">Faça check-ins por alguns dias e os padrões aparecem aqui.<br>(${wb.daysLogged} ${wb.daysLogged===1?'dia registrado':'dias registrados'})</div>`;
   }else{
-    const fmt=v=>v==null?'—':v.toFixed(1);
+    const selIds=wbSelectedIds();
+    const chips=state.habits.map(h=>`<button class="tag ${selIds.includes(h.id)?'sel':''}" onclick="toggleWbHabit('${h.id}')">${esc(h.emoji)} ${esc(h.name)}</button>`).join('');
+    const selHabits=state.habits.filter(h=>selIds.includes(h.id));
+    const habitCards=state.habits.length?(selHabits.length?selHabits.map(habitCorrCard).join(''):'<div class="wb-corr-insuf">Selecione um hábito acima.</div>'):'<div class="wb-corr-insuf">Crie hábitos pra cruzar com humor e sono.</div>';
     patterns=`
       <div class="wb-section-title">Padrões</div>
       <div class="wb-avg">
@@ -913,7 +975,11 @@ function renderWellbeing(){
       <div class="wb-card">
         <div class="wb-corr-t">Humor — últimos 21 dias</div>
         <div class="wb-trend">${wb.trend.map(s=>`<div class="wb-tbar" style="height:${s?Math.round(s/5*100):6}%;opacity:${s?1:.2}"></div>`).join('')}</div>
-      </div>`;
+      </div>
+      <div class="wb-section-title">Hábitos × Humor e Sono</div>
+      <p class="help" style="margin-top:-8px">Escolha quais hábitos comparar. Mostra o humor médio (mesmo dia) e a qualidade do sono na noite seguinte, nos dias <b>com</b> e <b>sem</b> o hábito.</p>
+      <div class="tag-row" style="margin-bottom:13px">${chips}</div>
+      ${habitCards}`;
   }
   content.innerHTML=checkin+patterns;
 }
