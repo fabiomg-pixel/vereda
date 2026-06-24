@@ -953,20 +953,27 @@ function computeAnalysis(){
   // hábitos -> bem-estar
   add('mood','cumprindo +hábitos (vs menos)',cmp(moodOf,d=>complOf(d)!=null&&complOf(d)>=0.7,d=>complOf(d)!=null&&complOf(d)<0.7));
   add('sleepNext','cumprindo +hábitos (vs menos)',cmp(nextSleepQOf,d=>complOf(d)!=null&&complOf(d)>=0.7,d=>complOf(d)!=null&&complOf(d)<0.7));
-  // fatores de humor (tags) -> humor, cumprimento, sono seguinte
-  for(const tag of MOOD_TAGS){
-    add('mood','em dias de "'+tag+'"',cmp(moodOf,d=>hasTag(d,'mood',tag),d=>moodOf(d)!=null&&!hasTag(d,'mood',tag)));
-    add('compl','em dias de "'+tag+'"',cmp(complOf,d=>hasTag(d,'mood',tag),d=>moodOf(d)!=null&&!hasTag(d,'mood',tag)));
-    add('sleepNext','em dias de "'+tag+'"',cmp(nextSleepQOf,d=>hasTag(d,'mood',tag),d=>moodOf(d)!=null&&!hasTag(d,'mood',tag)));
+  // fatores do dia (todas as tags: humor, dieta, saúde) -> humor, cumprimento, sono seguinte
+  const TAG_GROUPS=[{g:'mood',icon:'😊',tags:MOOD_TAGS},{g:'diet',icon:'🍽️',tags:DIET_TAGS},{g:'health',icon:'🩹',tags:HEALTH_TAGS}];
+  const logged=(d,g)=>{const e=daily[d]&&daily[d][g];return !!(e&&e.score)};
+  for(const grp of TAG_GROUPS)for(const tag of grp.tags){
+    const A=d=>hasTag(d,grp.g,tag),B=d=>logged(d,grp.g)&&!hasTag(d,grp.g,tag);
+    add('mood','em dias de "'+tag+'"',cmp(moodOf,A,B));
+    add('compl','em dias de "'+tag+'"',cmp(complOf,A,B));
+    add('sleepNext','em dias de "'+tag+'"',cmp(nextSleepQOf,A,B));
   }
   ins.sort((x,y)=>y.absn-x.absn);
-  // tabela de fatores (cada tag de humor)
+  // tabela de fatores (cada tag, ordenada por efeito)
   const factors=[];
-  for(const tag of MOOD_TAGS){
-    const c=cmp(complOf,d=>hasTag(d,'mood',tag),d=>moodOf(d)!=null&&!hasTag(d,'mood',tag));
-    const m=cmp(moodOf,d=>hasTag(d,'mood',tag),d=>moodOf(d)!=null&&!hasTag(d,'mood',tag));
-    if(m.na>=2)factors.push({tag,compl:c,mood:m,n:m.na});
+  for(const grp of TAG_GROUPS)for(const tag of grp.tags){
+    const A=d=>hasTag(d,grp.g,tag),B=d=>logged(d,grp.g)&&!hasTag(d,grp.g,tag);
+    let nFlag=0;for(const d of days)if(A(d))nFlag++;
+    if(nFlag<2)continue;
+    const c=cmp(complOf,A,B),m=cmp(moodOf,A,B);
+    const eff=Math.max((c.na>=2&&c.nb>=2)?Math.abs(c.a-c.b):0,(m.na>=2&&m.nb>=2)?Math.abs(m.a-m.b)/4:0);
+    factors.push({tag,icon:grp.icon,compl:c,mood:m,n:nFlag,eff});
   }
+  factors.sort((x,y)=>y.eff-x.eff);
   return {insights:ins,factors};
 }
 function corrCard(title,goodLabel,good,badLabel,bad){
@@ -1093,9 +1100,9 @@ function renderWellbeing(){
     const factRow=f=>{
       const c=(f.compl.na>=2&&f.compl.nb>=2)?`cumpr. ${Math.round(f.compl.a*100)}% vs ${Math.round(f.compl.b*100)}% ${arrowEl(f.compl.a,f.compl.b)}`:'cumpr. —';
       const m=(f.mood.na>=2&&f.mood.nb>=2)?`humor ${f.mood.a.toFixed(1)} vs ${f.mood.b.toFixed(1)} ${arrowEl(f.mood.a,f.mood.b)}`:'humor —';
-      return `<div class="fact"><div class="fact-t">${esc(f.tag)} <small>(${f.n}×)</small></div><div class="fact-v">${c} · ${m}</div></div>`;
+      return `<div class="fact"><div class="fact-t">${f.icon?f.icon+' ':''}${esc(f.tag)} <small>(${f.n}×)</small></div><div class="fact-v">${c} · ${m}</div></div>`;
     };
-    const factorsHtml=an.factors.length?`<div class="wb-card"><div class="wb-corr-t">Fatores do dia (humor)</div><p class="help" style="margin:2px 0 10px">Dias com o fator <b>vs sem</b> — impacto no cumprimento e no humor.</p>${an.factors.map(factRow).join('')}</div>`:'';
+    const factorsHtml=an.factors.length?`<div class="wb-card"><div class="wb-corr-t">Fatores do dia</div><p class="help" style="margin:2px 0 10px">Tags de 😊 humor, 🍽️ dieta e 🩹 saúde. Dias com o fator <b>vs sem</b> — impacto no cumprimento e no humor.</p>${an.factors.map(factRow).join('')}</div>`:'';
     patterns=`
       <div class="wb-section-title">Padrões</div>
       <div class="wb-avg">
