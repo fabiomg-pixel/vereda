@@ -195,6 +195,9 @@
   .level-xp{font-size:12px;color:var(--txt2);margin:3px 0 9px}
   .level-bar{height:9px;background:var(--bg2);border-radius:5px;overflow:hidden}
   .level-fill{height:100%;background:linear-gradient(90deg,var(--moss),var(--gold));border-radius:5px;transition:width .6s}
+  .level-card.wilting{border-color:var(--terra-d);background:linear-gradient(135deg,var(--card),#2a221c)}
+  .level-card.wilting .level-fill{background:linear-gradient(90deg,var(--terra-d),var(--terra))}
+  .level-wilt{font-size:11.5px;color:var(--terra);margin-top:9px;line-height:1.4}
   .ach-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:18px}
   .ach-card h4{font-family:'Fraunces',serif;font-weight:500;font-size:16px;margin-bottom:14px}
   .ach-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -627,7 +630,21 @@ function computeGame(){
     if(ee.diet&&ee.diet.score){checkinParts++;any=true}
     if(ee.health&&ee.health.score){checkinParts++;any=true}
     if(any)checkinDays++;}
-  const xp=totalDone*10+perfect*25+books*50+checkinParts*5;
+  const baseXp=totalDone*10+perfect*25+books*50+checkinParts*5;
+  // Decaimento: a planta murcha após dias parado (com obrigação e nada feito), fora da tolerância.
+  // Recuperável: cumprir um hábito hoje zera o desconto.
+  const dayInfo=(date,dd)=>{const sched=state.habits.filter(h=>isScheduled(h,dd)&&habitCreatedMs(h)<=dd.getTime()+86399999);const active=sched.filter(h=>!isSkipped(h.id,date));return {has:active.length>0,done:active.some(h=>isDone(h.id,date))}};
+  let inactive=0;
+  if(!dayInfo(todayKey(),new Date()).done){
+    const d=new Date();d.setDate(d.getDate()-1);let guard=0;
+    while(guard++<400){const k=ymd(d);const info=dayInfo(k,d);
+      if(!info.has){d.setDate(d.getDate()-1);continue}
+      if(info.done)break;
+      inactive++;d.setDate(d.getDate()-1);}
+  }
+  const GRACE=2,DECAY=15;
+  const penalty=Math.max(0,(inactive-GRACE))*DECAY;
+  const xp=Math.max(0,baseXp-penalty);
   let li=0;for(let i=0;i<LEVELS.length;i++)if(xp>=LEVELS[i].xp)li=i;
   const level=LEVELS[li],next=LEVELS[li+1]||null;
   const prog=next?(xp-level.xp)/(next.xp-level.xp):1;
@@ -651,15 +668,18 @@ function computeGame(){
     {id:'wb30',emoji:'📔',name:'Autoconhecimento',target:30,value:checkinDays,desc:'30 dias de check-in'},
   ];
   A.forEach(a=>a.unlocked=a.value>=a.target);
-  return {totalDone,perfect,books,best,xp,level,next,prog,achievements:A};
+  return {totalDone,perfect,books,best,xp,baseXp,penalty,inactive,level,next,prog,achievements:A};
 }
-let _prevAchIds=null,_prevLevelName=null;
+let _prevAchIds=null,_prevLevelName=null,_prevXp=0;
 function gameToasts(game){
   const nowSet=new Set(game.achievements.filter(a=>a.unlocked).map(a=>a.id));
-  if(_prevAchIds===null){_prevAchIds=nowSet;_prevLevelName=game.level.name;return}
+  if(_prevAchIds===null){_prevAchIds=nowSet;_prevLevelName=game.level.name;_prevXp=game.xp;return}
   for(const a of game.achievements)if(a.unlocked&&!_prevAchIds.has(a.id))flashSync('🏅 Conquista: '+a.name+'!');
-  if(game.level.name!==_prevLevelName)flashSync(game.level.emoji+' Subiu de nível: '+game.level.name+'!');
-  _prevAchIds=nowSet;_prevLevelName=game.level.name;
+  if(game.level.name!==_prevLevelName){
+    if(game.xp>=_prevXp)flashSync(game.level.emoji+' Subiu de nível: '+game.level.name+'!');
+    else flashSync('🥀 Murchou para '+game.level.name+'. Cumpra um hábito pra reviver.');
+  }
+  _prevAchIds=nowSet;_prevLevelName=game.level.name;_prevXp=game.xp;
 }
 
 function renderStats(){
@@ -768,13 +788,15 @@ function renderStats(){
 
   const game=computeGame();
   const L=game.level,N=game.next;
+  const wilt=game.penalty>0;
   const levelCard=`
-    <div class="level-card">
-      <div class="level-emoji">${L.emoji}</div>
+    <div class="level-card ${wilt?'wilting':''}">
+      <div class="level-emoji">${wilt?'🥀':L.emoji}</div>
       <div class="level-info">
-        <div class="level-name">${esc(L.name)}</div>
+        <div class="level-name">${esc(L.name)}${wilt?' <small style="color:var(--terra);font-weight:600">· murchando</small>':''}</div>
         <div class="level-xp">${game.xp} XP${N?' · faltam '+(N.xp-game.xp)+' pra '+esc(N.name)+' '+N.emoji:' · nível máximo 🎉'}</div>
         <div class="level-bar"><div class="level-fill" style="width:${Math.round(game.prog*100)}%"></div></div>
+        ${wilt?`<div class="level-wilt">🥀 Parado há ${game.inactive} dias · −${game.penalty} XP. Cumpra um hábito hoje pra reviver.</div>`:''}
       </div>
     </div>`;
   const unlockedCt=game.achievements.filter(a=>a.unlocked).length;
