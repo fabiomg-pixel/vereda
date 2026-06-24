@@ -49,9 +49,9 @@
   .summary-txt p{font-size:13px;color:var(--txt2);line-height:1.45}
 
   /* TABS */
-  .tabs{display:flex;gap:8px;margin-bottom:16px}
-  .tab{flex:1;background:var(--card);border:1px solid var(--line);color:var(--txt2);padding:9px;border-radius:13px;
-    font-family:'Hanken Grotesk';font-weight:600;font-size:13px;cursor:pointer;transition:.2s}
+  .tabs{display:flex;gap:6px;margin-bottom:16px}
+  .tab{flex:1;background:var(--card);border:1px solid var(--line);color:var(--txt2);padding:9px 3px;border-radius:13px;
+    font-family:'Hanken Grotesk';font-weight:600;font-size:12.5px;cursor:pointer;transition:.2s}
   .tab.active{background:var(--moss-d);border-color:var(--moss);color:#fff}
 
   /* HABIT CARD */
@@ -205,6 +205,35 @@
   .ach-ds{font-size:10px;color:var(--txt3);margin-top:2px;line-height:1.3}
   .ach-pg{font-size:10px;color:var(--moss);font-weight:700;margin-top:4px}
 
+  /* BEM-ESTAR */
+  .wb-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:13px}
+  .wb-head{font-family:'Fraunces',serif;font-weight:600;font-size:17px;margin-bottom:10px}
+  .wb-head small{font-family:'Hanken Grotesk';font-weight:500;font-size:12px;color:var(--txt3)}
+  .wb-sub{font-size:11px;color:var(--txt2);font-weight:600;margin:12px 0 7px;text-transform:uppercase;letter-spacing:.5px}
+  .face-row{display:flex;gap:7px}
+  .face{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:12px;font-size:24px;padding:8px 0;cursor:pointer;transition:.15s;filter:grayscale(.7);opacity:.55}
+  .face.sel{background:var(--card2);border-color:var(--moss);filter:none;opacity:1;transform:scale(1.06)}
+  .stepper{display:flex;align-items:center;gap:14px}
+  .stepper button{width:44px;height:44px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);color:var(--txt);font-size:22px;cursor:pointer}
+  .stepper span{font-family:'Fraunces',serif;font-size:20px;font-weight:600;min-width:54px;text-align:center}
+  .wb-note{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;color:var(--txt);font-family:'Hanken Grotesk';font-size:15px;margin-top:12px}
+  .wb-note:focus{outline:none;border-color:var(--moss)}
+  .tag-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tag{background:var(--bg2);border:1px solid var(--line);color:var(--txt2);border-radius:20px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .tag.sel{background:var(--moss-d);border-color:var(--moss);color:#fff}
+  .wb-section-title{font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:22px 0 13px}
+  .wb-avg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:13px}
+  .wb-corr{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:11px}
+  .wb-corr-t{font-weight:700;font-size:14px;margin-bottom:9px}
+  .wb-corr-rows{display:flex;flex-direction:column;gap:6px}
+  .wb-corr-rows>div{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--txt2)}
+  .wb-corr-rows b{color:var(--txt);font-size:15px}
+  .wb-corr-note{font-size:12px;color:var(--moss);margin-top:9px}
+  .wb-corr-insuf{font-size:12px;color:var(--txt3)}
+  .wb-trend{display:flex;gap:3px;align-items:flex-end;height:70px;margin-top:8px}
+  .wb-tbar{flex:1;background:var(--moss);border-radius:3px;min-height:3px}
+  .wb-empty{text-align:center;color:var(--txt3);font-size:14px;padding:24px 16px;line-height:1.7}
+
   /* LIBRARY (finished) */
   .lib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
   .lib-item{display:flex;flex-direction:column;gap:5px;cursor:pointer}
@@ -277,6 +306,7 @@
     <button class="tab active" data-view="today">Hoje</button>
     <button class="tab" data-view="all">Todos</button>
     <button class="tab" data-view="stats">Progresso</button>
+    <button class="tab" data-view="wellbeing">Bem-estar</button>
   </div>
 
   <div id="content"></div>
@@ -388,6 +418,7 @@ if(!state.skipped)state.skipped={};
 if(!state.current)state.current={};
 if(!state.finished)state.finished=[];
 if(!state.tombstones)state.tombstones={};
+if(!state.daily)state.daily={};
 state.habits.forEach(h=>{
   if(!h.days)h.days=(PRESET_DAYS[h.freq]||[0,1,2,3,4,5,6]).slice();
   if(!h.type)h.type='simple';
@@ -502,6 +533,7 @@ function render(){
   else{st.textContent=done+' de '+active.length+' feitos';ss.textContent='Faltam '+(active.length-done)+' para fechar o dia'+(skippedCt?` (${skippedCt} pulado${skippedCt>1?'s':''})`:'')+'.';}
 
   if(currentView==='stats'){renderStats();return}
+  if(currentView==='wellbeing'){renderWellbeing();return}
   const list=currentView==='today'?sched:state.habits;
   if(list.length===0){
     content.innerHTML='<div class="empty"><div class="em">🌱</div><p>'+
@@ -581,7 +613,13 @@ function computeGame(){
     }
   }
   const books=(state.finished||[]).length;
-  const xp=totalDone*10+perfect*25+books*50;
+  let checkinDays=0,checkinParts=0;
+  for(const dt in (state.daily||{})){const ee=state.daily[dt];let any=false;
+    if(ee.mood&&ee.mood.score){checkinParts++;any=true}
+    if(ee.sleep&&ee.sleep._ts){checkinParts++;any=true}
+    if(ee.diet&&ee.diet.score){checkinParts++;any=true}
+    if(any)checkinDays++;}
+  const xp=totalDone*10+perfect*25+books*50+checkinParts*5;
   let li=0;for(let i=0;i<LEVELS.length;i++)if(xp>=LEVELS[i].xp)li=i;
   const level=LEVELS[li],next=LEVELS[li+1]||null;
   const prog=next?(xp-level.xp)/(next.xp-level.xp):1;
@@ -601,6 +639,8 @@ function computeGame(){
     {id:'b1',emoji:'📖',name:'Primeira leitura',target:1,value:books,desc:'1 livro lido'},
     {id:'b5',emoji:'📚',name:'Leitor',target:5,value:books,desc:'5 livros lidos'},
     {id:'b10',emoji:'📚',name:'Devorador',target:10,value:books,desc:'10 livros lidos'},
+    {id:'wb7',emoji:'📝',name:'Diário',target:7,value:checkinDays,desc:'7 dias de check-in'},
+    {id:'wb30',emoji:'📔',name:'Autoconhecimento',target:30,value:checkinDays,desc:'30 dias de check-in'},
   ];
   A.forEach(a=>a.unlocked=a.value>=a.target);
   return {totalDone,perfect,books,best,xp,level,next,prog,achievements:A};
@@ -769,6 +809,113 @@ function renderStats(){
       <h4>Desempenho por hábito (30d)</h4>
       ${phRows}
     </div>`;
+}
+
+/* ---------- BEM-ESTAR (sono / humor / dieta + padrões) ---------- */
+const FACES=['😣','😕','😐','🙂','😄'];
+const DIET_TAGS=['Comi bem','Exagerei','Pulei refeição','Muito açúcar','Álcool','Fora de casa'];
+function ensureDaily(date){if(!state.daily[date])state.daily[date]={};return state.daily[date]}
+function setSleepQuality(q){const e=ensureDaily(todayKey());e.sleep=Object.assign({quality:0,hours:7.5},e.sleep,{quality:q,_ts:Date.now()});save();renderWellbeing()}
+function setSleepHours(delta){const e=ensureDaily(todayKey());const base=(e.sleep&&e.sleep.hours!=null)?e.sleep.hours:7.5;const h=Math.max(0,Math.min(14,Math.round((base+delta)*2)/2));e.sleep=Object.assign({quality:0,hours:7.5},e.sleep,{hours:h,_ts:Date.now()});save();renderWellbeing()}
+function setMood(s){const e=ensureDaily(todayKey());e.mood=Object.assign({score:0,note:''},e.mood,{score:s,_ts:Date.now()});save();renderWellbeing()}
+function setMoodNote(v){const e=ensureDaily(todayKey());e.mood=Object.assign({score:0,note:''},e.mood,{note:v,_ts:Date.now()});save()}
+function setDiet(s){const e=ensureDaily(todayKey());e.diet=Object.assign({score:0,tags:[],note:''},e.diet,{score:s,_ts:Date.now()});save();renderWellbeing()}
+function setDietNote(v){const e=ensureDaily(todayKey());e.diet=Object.assign({score:0,tags:[],note:''},e.diet,{note:v,_ts:Date.now()});save()}
+function toggleDietTag(t){const e=ensureDaily(todayKey());const d=Object.assign({score:0,tags:[],note:''},e.diet);d.tags=(d.tags||[]).slice();const i=d.tags.indexOf(t);if(i>=0)d.tags.splice(i,1);else d.tags.push(t);d._ts=Date.now();e.diet=d;save();renderWellbeing()}
+function faceRow(cur,fn){return FACES.map((f,i)=>`<button class="face ${cur===i+1?'sel':''}" onclick="${fn}(${i+1})">${f}</button>`).join('')}
+
+function dayCompletionPct(date){
+  const d=new Date(date+'T00:00');const end=d.getTime()+86399999;
+  const sched=state.habits.filter(h=>isScheduled(h,d)&&habitCreatedMs(h)<=end);
+  const active=sched.filter(h=>!isSkipped(h.id,date));
+  if(!active.length)return null;
+  return active.filter(h=>isDone(h.id,date)).length/active.length;
+}
+function computeWellbeing(){
+  const daily=state.daily||{};
+  const days=Object.keys(daily).sort();
+  const moodDays=days.filter(d=>daily[d].mood&&daily[d].mood.score);
+  const today=todayKey();
+  const recent=d=>(new Date(today)-new Date(d))/86400000<30;
+  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const moodAvg30=avg(days.filter(d=>recent(d)&&daily[d].mood&&daily[d].mood.score).map(d=>daily[d].mood.score));
+  const sleepHrs30=avg(days.filter(d=>recent(d)&&daily[d].sleep&&daily[d].sleep._ts&&daily[d].sleep.hours!=null).map(d=>daily[d].sleep.hours));
+  const sleepQ30=avg(days.filter(d=>recent(d)&&daily[d].sleep&&daily[d].sleep.quality).map(d=>daily[d].sleep.quality));
+  const moodWhere=pred=>{const xs=moodDays.filter(pred).map(d=>daily[d].mood.score);return {avg:avg(xs),n:xs.length}};
+  const corr={
+    sleepGood:moodWhere(d=>daily[d].sleep&&daily[d].sleep.quality>=4),
+    sleepBad:moodWhere(d=>daily[d].sleep&&daily[d].sleep.quality&&daily[d].sleep.quality<=2),
+    habitHigh:moodWhere(d=>{const p=dayCompletionPct(d);return p!==null&&p>=0.7}),
+    habitLow:moodWhere(d=>{const p=dayCompletionPct(d);return p!==null&&p<0.7}),
+    dietGood:moodWhere(d=>daily[d].diet&&daily[d].diet.score>=4),
+    dietBad:moodWhere(d=>daily[d].diet&&daily[d].diet.score&&daily[d].diet.score<=2),
+  };
+  const trend=[];for(let i=20;i>=0;i--){const dt=new Date();dt.setDate(dt.getDate()-i);const k=ymd(dt);trend.push(daily[k]&&daily[k].mood?daily[k].mood.score:null)}
+  return {daysLogged:days.length,moodCount:moodDays.length,moodAvg30,sleepHrs30,sleepQ30,corr,trend};
+}
+function corrCard(title,goodLabel,good,badLabel,bad){
+  if(!good||!bad||good.n<2||bad.n<2)
+    return `<div class="wb-corr"><div class="wb-corr-t">${title}</div><div class="wb-corr-insuf">Poucos dados ainda pra comparar.</div></div>`;
+  const diff=good.avg-bad.avg;
+  const note=diff>=0.4?'Humor melhor quando: '+goodLabel.toLowerCase():diff<=-0.4?'Humor melhor quando: '+badLabel.toLowerCase():'Sem diferença marcante.';
+  return `<div class="wb-corr">
+    <div class="wb-corr-t">${title}</div>
+    <div class="wb-corr-rows">
+      <div><span>${goodLabel} (${good.n})</span><b>${good.avg.toFixed(1)} ${FACES[Math.max(0,Math.round(good.avg)-1)]}</b></div>
+      <div><span>${badLabel} (${bad.n})</span><b>${bad.avg.toFixed(1)} ${FACES[Math.max(0,Math.round(bad.avg)-1)]}</b></div>
+    </div>
+    <div class="wb-corr-note">${note}</div>
+  </div>`;
+}
+function renderWellbeing(){
+  const date=todayKey();const e=state.daily[date]||{};
+  const sleep=e.sleep||{},mood=e.mood||{},diet=e.diet||{};
+  const hrs=(sleep._ts&&sleep.hours!=null)?sleep.hours:7.5;
+  const wb=computeWellbeing();
+  const checkin=`
+    <div class="wb-card">
+      <div class="wb-head">🌙 Sono <small>de hoje</small></div>
+      <div class="wb-sub">Qualidade</div>
+      <div class="face-row">${faceRow(sleep.quality||0,'setSleepQuality')}</div>
+      <div class="wb-sub">Horas dormidas</div>
+      <div class="stepper">
+        <button onclick="setSleepHours(-0.5)">−</button>
+        <span>${sleep._ts?hrs+'h':'—'}</span>
+        <button onclick="setSleepHours(0.5)">+</button>
+      </div>
+    </div>
+    <div class="wb-card">
+      <div class="wb-head">😊 Humor <small>do dia</small></div>
+      <div class="face-row">${faceRow(mood.score||0,'setMood')}</div>
+      <input type="text" class="wb-note" placeholder="Alguma eventualidade? (opcional)" value="${esc(mood.note||'')}" oninput="setMoodNote(this.value)" maxlength="140">
+    </div>
+    <div class="wb-card">
+      <div class="wb-head">🍽️ Alimentação <small>do dia</small></div>
+      <div class="face-row">${faceRow(diet.score||0,'setDiet')}</div>
+      <div class="tag-row">${DIET_TAGS.map(t=>`<button class="tag ${(diet.tags||[]).includes(t)?'sel':''}" onclick="toggleDietTag('${t}')">${t}</button>`).join('')}</div>
+      <input type="text" class="wb-note" placeholder="Observação (opcional)" value="${esc(diet.note||'')}" oninput="setDietNote(this.value)" maxlength="140">
+    </div>`;
+  let patterns;
+  if(wb.moodCount<4){
+    patterns=`<div class="wb-section-title">Padrões</div><div class="wb-empty">Registre seu humor por alguns dias e os padrões aparecem aqui.<br>(${wb.moodCount} ${wb.moodCount===1?'dia registrado':'dias registrados'})</div>`;
+  }else{
+    const fmt=v=>v==null?'—':v.toFixed(1);
+    patterns=`
+      <div class="wb-section-title">Padrões</div>
+      <div class="wb-avg">
+        <div class="stat-card moss"><b>${fmt(wb.moodAvg30)}</b><span>Humor médio (30d)</span></div>
+        <div class="stat-card"><b>${wb.sleepHrs30!=null?wb.sleepHrs30.toFixed(1)+'h':'—'}</b><span>Sono médio</span></div>
+        <div class="stat-card"><b>${fmt(wb.sleepQ30)}</b><span>Qualidade sono</span></div>
+      </div>
+      ${corrCard('Humor × Sono','Dormiu bem',wb.corr.sleepGood,'Dormiu mal',wb.corr.sleepBad)}
+      ${corrCard('Humor × Hábitos','Hábitos em dia',wb.corr.habitHigh,'Hábitos atrasados',wb.corr.habitLow)}
+      ${corrCard('Humor × Alimentação','Comeu bem',wb.corr.dietGood,'Comeu mal',wb.corr.dietBad)}
+      <div class="wb-card">
+        <div class="wb-corr-t">Humor — últimos 21 dias</div>
+        <div class="wb-trend">${wb.trend.map(s=>`<div class="wb-tbar" style="height:${s?Math.round(s/5*100):6}%;opacity:${s?1:.2}"></div>`).join('')}</div>
+      </div>`;
+  }
+  content.innerHTML=checkin+patterns;
 }
 
 function delHabit(id){
@@ -1041,7 +1188,7 @@ function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==
 function sig(s){const c=JSON.parse(JSON.stringify(s||{}));delete c.updatedAt;return JSON.stringify(sortKeys(c))}
 function mergeStates(a,b){
   a=a||{};b=b||{};
-  const out={habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},updatedAt:0};
+  const out={habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},daily:{},updatedAt:0};
   const tomb={};
   [a,b].forEach(s=>{const t=s.tombstones||{};for(const id in t)tomb[id]=Math.max(tomb[id]||0,t[id])});
   const hmap={};
@@ -1058,6 +1205,8 @@ function mergeStates(a,b){
   for(const hid in out.current){const c=out.current[hid];
     const fin=out.finished.some(f=>f.habitId===hid&&((f.mediaId&&c.mediaId)?f.mediaId===c.mediaId:f.title===c.title)&&(!c.startDate||(f.endDate||'')>=c.startDate));
     if(fin)delete out.current[hid];}
+  [a,b].forEach(s=>{const dd=s.daily||{};for(const dt in dd){const e=dd[dt]||{};const cur=out.daily[dt]||(out.daily[dt]={});
+    ['sleep','mood','diet'].forEach(tk=>{const v=e[tk];if(v&&(!cur[tk]||(v._ts||0)>(cur[tk]._ts||0)))cur[tk]=v})}});
   out.updatedAt=Math.max(a.updatedAt||0,b.updatedAt||0);
   return out;
 }
