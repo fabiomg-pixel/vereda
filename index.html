@@ -170,7 +170,42 @@
   .per-habit h4{font-family:'Fraunces',serif;font-weight:500;font-size:16px;margin-bottom:14px}
   .ph-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
   .ph-row:last-child{margin-bottom:0}
-  .ph-name{font-size:14px;width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+  .ph-name{font-size:14px;width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+  .ph-name>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .ph-stars{color:var(--gold);font-size:11px;flex-shrink:0}
+  .ph-av{font-size:9px;color:var(--terra);border:1px solid var(--terra-d);border-radius:5px;padding:0 4px;flex-shrink:0}
+  /* estrelas + contenção nas linhas de hábito */
+  .h-stars{color:var(--gold);font-size:11px;letter-spacing:1px;margin-left:5px}
+  .h-avoid{font-size:9px;color:var(--terra);border:1px solid var(--terra-d);border-radius:6px;padding:1px 5px;margin-left:6px;text-transform:uppercase;letter-spacing:.5px}
+  .h-pts{font-size:11px;font-weight:600}
+  .h-pts.pos{color:var(--moss)}
+  .h-pts.neg{color:var(--terra)}
+  .habit.avoid{border-style:dashed}
+  .habit.avoid .accent{background:var(--terra)}
+  .habit.avoid .check{border-color:var(--terra-d)}
+  .habit.slip-bad{border-color:var(--terra-d);background:rgba(200,113,74,.08)}
+  .habit.slip-bad .check{background:var(--terra);border-color:var(--terra)}
+  .x-mark{color:#fff;font-weight:700;font-size:15px;line-height:1}
+  /* seletores objetivo/prioridade no form */
+  .pol-pick,.prio-pick{flex:1;min-width:60px;background:var(--card);border:1px solid var(--line);color:var(--txt2);border-radius:12px;padding:10px 6px;font-size:13px;cursor:pointer}
+  .pol-pick.sel,.prio-pick.sel{background:var(--moss-d);border-color:var(--moss);color:#fff}
+  .pol-pick[data-pol="avoid"].sel{background:var(--terra-d);border-color:var(--terra)}
+  .prio-lbl{font-size:11px;color:var(--txt3);font-weight:400}
+  /* modal detalhe de hábito */
+  .hstat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .hstat-c{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px}
+  .hstat-c b{font-size:22px;color:var(--moss);display:block;line-height:1}
+  .hstat-c.bad b{color:var(--terra)}
+  .hstat-c span{font-size:10px;color:var(--txt3);display:block;margin-top:5px;text-transform:uppercase;letter-spacing:.3px}
+  .hstat-heat-label{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .hstat-heat{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:8px}
+  .hstat-cell{aspect-ratio:1;border-radius:3px;background:var(--card2);border:1px solid var(--line)}
+  .hstat-cell.ok{background:var(--moss);border-color:var(--moss)}
+  .hstat-cell.slip{background:var(--terra);border-color:var(--terra)}
+  .hstat-cell.skip{background:var(--gold);opacity:.45}
+  .hstat-cell.na{background:transparent;border-style:dashed}
+  .hstat-legend{font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .hstat-legend .hstat-cell{width:12px;height:12px;aspect-ratio:auto;display:inline-block;vertical-align:middle}
   .ph-bar{flex:1;height:9px;background:var(--card2);border-radius:5px;overflow:hidden}
   .ph-fill{height:100%;border-radius:5px;transition:width .6s}
   .ph-pct{font-size:13px;font-weight:600;width:38px;text-align:right;color:var(--txt2)}
@@ -363,6 +398,22 @@
       <input type="text" id="hName" placeholder="ex. Beber 2L de água" maxlength="40">
     </div>
     <div class="field">
+      <label>Objetivo</label>
+      <div class="type-row" id="polRow">
+        <button class="pol-pick sel" data-pol="good">✓ Construir</button>
+        <button class="pol-pick" data-pol="avoid">✕ Evitar</button>
+      </div>
+      <p class="help" id="polHint" style="margin-top:6px"></p>
+    </div>
+    <div class="field">
+      <label>Prioridade <span class="prio-lbl" id="prioLbl"></span></label>
+      <div class="type-row" id="prioRow">
+        <button class="prio-pick sel" data-prio="1">★ Baixa</button>
+        <button class="prio-pick" data-prio="2">★★ Média</button>
+        <button class="prio-pick" data-prio="3">★★★ Alta</button>
+      </div>
+    </div>
+    <div class="field" id="typeField">
       <label>Tipo</label>
       <div class="type-row" id="typeRow">
         <button class="type-pick sel" data-type="simple">Simples</button>
@@ -460,10 +511,13 @@ if(!state.finished)state.finished=[];
 if(!state.tombstones)state.tombstones={};
 if(!state.daily)state.daily={};
 if(!state.events)state.events={};
+if(!state.slips)state.slips={};
 if(!state.theme)state.theme='jardim';
 state.habits.forEach(h=>{
   if(!h.days)h.days=(PRESET_DAYS[h.freq]||[0,1,2,3,4,5,6]).slice();
   if(!h.type)h.type='simple';
+  if(!h.priority)h.priority=1;
+  if(!h.polarity)h.polarity='good';
   if(h.updatedAt==null)h.updatedAt=0;
 });
 function persist(){state.updatedAt=Date.now();localStorage.setItem('vereda_v1',JSON.stringify(state))}
@@ -477,6 +531,9 @@ const todayKey=()=>ymd(new Date());
 function isScheduled(h,date){return h.days?h.days.includes(date.getDay()):true}
 function isDone(id,key){return !!(state.log[key]&&state.log[key].includes(id))}
 function isSkipped(id,key){return !!(state.skipped[key]&&state.skipped[key].includes(id))}
+function isSlipped(id,key){return !!(state.slips[key]&&state.slips[key].includes(id))}
+function isAvoid(h){return h&&h.polarity==='avoid'}
+function habitPts(h){return (h.priority||1)*10}
 
 function toggle(id){
   const k=todayKey();
@@ -496,13 +553,24 @@ function toggleSkip(id){
   save();render();
   if(navigator.vibrate)navigator.vibrate(10);
 }
-// Tap on check: media w/o current → open search; else toggle
+// Tap on check: contenção → registra/desfaz desvio; media w/o current → busca; else toggle
 function tapCheck(id){
   const h=state.habits.find(x=>x.id===id);
+  if(h&&isAvoid(h)){toggleAvoid(id);return;}
   if(h&&h.type==='media'&&!state.current[id]&&!isDone(id,todayKey())){
     openSearch(id);return;
   }
   toggle(id);
+}
+// Contenção (evitar): marcar = registrar desvio (penaliza XP); desmarcar = restaurar
+function toggleAvoid(id){
+  const k=todayKey();
+  if(!state.slips[k])state.slips[k]=[];
+  const i=state.slips[k].indexOf(id);
+  if(i>=0){state.slips[k].splice(i,1);}
+  else{state.slips[k].push(id);}
+  save();render();
+  if(navigator.vibrate)navigator.vibrate(10);
 }
 
 function habitStreak(h){
@@ -522,7 +590,7 @@ function globalStreak(){
   let s=0;const d=new Date();
   for(let i=0;i<400;i++){
     const k=ymd(d);
-    const sched=state.habits.filter(h=>isScheduled(h,d));
+    const sched=state.habits.filter(h=>isScheduled(h,d)&&!isAvoid(h));
     if(sched.length===0){d.setDate(d.getDate()-1);continue}
     const active=sched.filter(h=>!isSkipped(h.id,k));
     if(active.length===0){d.setDate(d.getDate()-1);continue}
@@ -559,8 +627,9 @@ function render(){
   document.getElementById('today').textContent=new Date().toLocaleDateString('pt-BR',dopt);
   const d=new Date();const k=todayKey();
   const sched=state.habits.filter(h=>isScheduled(h,d));
-  const active=sched.filter(h=>!isSkipped(h.id,k));
-  const skippedCt=sched.length-active.length;
+  const posSched=sched.filter(h=>!isAvoid(h));
+  const active=posSched.filter(h=>!isSkipped(h.id,k));
+  const skippedCt=posSched.length-active.length;
   const done=active.filter(h=>isDone(h.id,k)).length;
   const pct=active.length?Math.round(done/active.length*100):0;
   const circ=207.3;
@@ -570,6 +639,7 @@ function render(){
   const _g=computeGame();gameToasts(_g);commitGameEvents(_g);
   const st=document.getElementById('summaryTitle'),ss=document.getElementById('summarySub');
   if(sched.length===0){st.textContent='Comece o dia';ss.textContent='Adicione seu primeiro hábito.';}
+  else if(posSched.length===0){st.textContent='Só contenções hoje';ss.textContent='Evite os hábitos marcados para ganhar bônus.';}
   else if(active.length===0){st.textContent='Dia em pausa';ss.textContent='Todos os hábitos de hoje foram pulados.';}
   else if(pct===100){st.textContent='Dia completo! 🌿';ss.textContent=skippedCt?`Feitos: ${done}. Pulados: ${skippedCt}.`:'Você cumpriu todos os hábitos de hoje.';}
   else{st.textContent=done+' de '+active.length+' feitos';ss.textContent='Faltam '+(active.length-done)+' para fechar o dia'+(skippedCt?` (${skippedCt} pulado${skippedCt>1?'s':''})`:'')+'.';}
@@ -583,14 +653,17 @@ function render(){
     return;
   }
   content.innerHTML='<div class="habits">'+list.map(h=>{
+    const av=isAvoid(h);
     const isD=isDone(h.id,k);
     const isS=isSkipped(h.id,k);
+    const sl=isSlipped(h.id,k);
     const sc=isScheduled(h,d);
     const stk=habitStreak(h);
     const freqLabel=formatDays(h.days);
-    const cur=h.type==='media'?state.current[h.id]:null;
+    const stars='<span class="h-stars">'+'★'.repeat(h.priority||1)+'</span>';
+    const cur=(!av&&h.type==='media')?state.current[h.id]:null;
     let mediaHtml='';
-    if(h.type==='media'){
+    if(!av&&h.type==='media'){
       if(cur){
         mediaHtml=`<div class="h-media">
           ${cur.cover?`<img class="h-media-cover" src="${esc(cur.cover)}" alt="" onerror="this.outerHTML='<div class=\\'h-media-cover empty\\'>📖</div>'">`:'<div class="h-media-cover empty">📖</div>'}
@@ -603,22 +676,28 @@ function render(){
         mediaHtml='<div class="h-media-empty">Toque ✓ para começar um livro</div>';
       }
     }
-    return `<div class="habit ${isD?'done':''} ${isS?'skipped':''}" style="--c:${h.color}">
+    const checkInner=av
+      ? (sl?'<span class="x-mark">✕</span>':'')
+      : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${h.type==='media'&&!cur&&!isD&&!isS?'<span class="check-plus">+</span>':''}`;
+    const containerCls=av?`habit avoid ${sl?'slip-bad':''}`:`habit ${isD?'done':''} ${isS?'skipped':''}`;
+    const ptsBadge=av
+      ? `<span class="h-pts ${sl?'neg':'pos'}">${sl?'−'+habitPts(h):'+'+(h.priority||1)*5}</span>`
+      : `<span class="h-pts pos">+${habitPts(h)}</span>`;
+    return `<div class="${containerCls}" style="--c:${h.color}">
       <div class="accent"></div>
-      <div class="check" onclick="event.stopPropagation();tapCheck('${h.id}')">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        ${h.type==='media'&&!cur&&!isD&&!isS?'<span class="check-plus">+</span>':''}
-      </div>
+      <div class="check" onclick="event.stopPropagation();tapCheck('${h.id}')">${checkInner}</div>
       <div class="h-info" onclick="openActions('${h.id}')">
-        <div class="icon-name"><span class="h-emoji">${esc(h.emoji)}</span><span class="h-name">${esc(h.name)}</span></div>
+        <div class="icon-name"><span class="h-emoji">${esc(h.emoji)}</span><span class="h-name">${esc(h.name)}</span>${stars}${av?'<span class="h-avoid">evitar</span>':''}</div>
         <div class="h-meta">
           <span>${freqLabel}</span>
-          ${h.reminder?`<span>🔔 ${esc(h.reminder)}</span>`:''}
+          ${ptsBadge}
+          ${h.reminder&&!av?`<span>🔔 ${esc(h.reminder)}</span>`:''}
           ${isS?'<span class="h-skip">↷ pulado hoje</span>':''}
-          ${stk>0?`<span class="h-streak">🔥 ${stk} dia${stk>1?'s':''}</span>`:''}
+          ${av&&sl?'<span class="h-skip">✕ desvio hoje</span>':''}
+          ${stk>0&&!av?`<span class="h-streak">🔥 ${stk} dia${stk>1?'s':''}</span>`:''}
           ${currentView==='all'&&!sc?'<span>· hoje não</span>':''}
         </div>
-        ${mediaHtml}
+        ${av?'':mediaHtml}
       </div>
       <button class="h-chev" onclick="openActions('${h.id}')" aria-label="Mais ações">›</button>
     </div>`;
@@ -666,17 +745,25 @@ function habitCreatedMs(h){const t=parseInt(String(h.id||'').replace(/^h/,''),10
 function computeGame(){
   let totalDone=0;
   for(const k in state.log)totalDone+=(state.log[k]||[]).length;
-  let best=0,perfect=0,bloomDays=0;
-  const keys=Object.keys(state.log).concat(Object.keys(state.skipped)).filter(Boolean).sort();
+  let best=0,perfect=0,bloomDays=0,donePts=0,avoidPts=0;
+  const keys=[...new Set(Object.keys(state.log).concat(Object.keys(state.skipped),Object.keys(state.slips||{})))].filter(Boolean).sort();
   if(keys.length){
     const today=todayKey();let run=0,guard=0;
     const d=new Date(keys[0]+'T00:00');
     while(ymd(d)<=today&&guard++<2000){
       const k=ymd(d);const dayEnd=d.getTime()+86399999;
       const sched=state.habits.filter(h=>isScheduled(h,d)&&habitCreatedMs(h)<=dayEnd);
-      const active=sched.filter(h=>!isSkipped(h.id,k));
+      const avoid=sched.filter(isAvoid);
+      const active=sched.filter(h=>!isAvoid(h)&&!isSkipped(h.id,k));
+      // pontos ponderados por prioridade (★) dos hábitos positivos concluídos
+      (state.log[k]||[]).forEach(id=>{const h=state.habits.find(x=>x.id===id);if(h&&!isAvoid(h))donePts+=(h.priority||1)*10;});
+      // contenção: resistir dá +5×★, registrar desvio tira −10×★
+      avoid.forEach(h=>{if(isSlipped(h.id,k))avoidPts-=(h.priority||1)*10;else avoidPts+=(h.priority||1)*5;});
+      // dia perfeito: todos positivos ativos feitos E nenhum desvio de contenção
       if(active.length>0){
-        if(active.every(h=>isDone(h.id,k))){run++;perfect++;if(run>best)best=run;if(run>=3)bloomDays++}
+        const allDone=active.every(h=>isDone(h.id,k));
+        const clean=avoid.every(h=>!isSlipped(h.id,k));
+        if(allDone&&clean){run++;perfect++;if(run>best)best=run;if(run>=3)bloomDays++}
         else if(k!==today)run=0;
       }
       d.setDate(d.getDate()+1);
@@ -691,10 +778,10 @@ function computeGame(){
     if(ee.health&&ee.health.score){checkinParts++;any=true}
     if(any)checkinDays++;
     if(ee.mood&&ee.mood.score>=4&&ee.sleep&&ee.sleep.quality>=4)wellBonusDays++;}
-  const baseXp=totalDone*10+perfect*25+bloomDays*15+books*50+checkinParts*5+wellBonusDays*15;
+  const baseXp=donePts+avoidPts+perfect*25+bloomDays*15+books*50+checkinParts*5+wellBonusDays*15;
   // Decaimento: a planta murcha após dias parado (com obrigação e nada feito), fora da tolerância.
-  // Recuperável: cumprir um hábito hoje zera o desconto.
-  const dayInfo=(date,dd)=>{const sched=state.habits.filter(h=>isScheduled(h,dd)&&habitCreatedMs(h)<=dd.getTime()+86399999);const active=sched.filter(h=>!isSkipped(h.id,date));return {has:active.length>0,done:active.some(h=>isDone(h.id,date))}};
+  // Recuperável: cumprir um hábito hoje zera o desconto. (contenções não contam pra inatividade)
+  const dayInfo=(date,dd)=>{const sched=state.habits.filter(h=>isScheduled(h,dd)&&!isAvoid(h)&&habitCreatedMs(h)<=dd.getTime()+86399999);const active=sched.filter(h=>!isSkipped(h.id,date));return {has:active.length>0,done:active.some(h=>isDone(h.id,date))}};
   let inactive=0;
   if(!dayInfo(todayKey(),new Date()).done){
     const d=new Date();d.setDate(d.getDate()-1);let guard=0;
@@ -844,16 +931,21 @@ function renderStats(){
   }
 
   const phRows=state.habits.map(h=>{
+    const av=isAvoid(h);
     let t=0,c=0;
     for(let i=0;i<30;i++){
       const dt=new Date();dt.setDate(dt.getDate()-i);
       const k=ymd(dt);
-      if(isScheduled(h,dt)&&!isSkipped(h.id,k)){t++;if(isDone(h.id,k))c++}
+      if(isScheduled(h,dt)&&habitCreatedMs(h)<=dt.getTime()+86399999){
+        if(av){t++;if(!isSlipped(h.id,k))c++}
+        else if(!isSkipped(h.id,k)){t++;if(isDone(h.id,k))c++}
+      }
     }
     const p=t?Math.round(c/t*100):0;
-    return `<div class="ph-row">
-      <div class="ph-name"><span>${esc(h.emoji)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name)}</span></div>
-      <div class="ph-bar"><div class="ph-fill" style="width:${p}%;background:${h.color}"></div></div>
+    const stars='<span class="ph-stars">'+'★'.repeat(h.priority||1)+'</span>';
+    return `<div class="ph-row" onclick="openHabitStat('${h.id}')" style="cursor:pointer">
+      <div class="ph-name"><span>${esc(h.emoji)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name)}</span>${av?'<span class="ph-av">evitar</span>':''}${stars}</div>
+      <div class="ph-bar"><div class="ph-fill" style="width:${p}%;background:${av?'#c8714a':h.color}"></div></div>
       <div class="ph-pct">${p}%</div>
     </div>`;
   }).join('')||'<p style="color:var(--txt3);font-size:13px">Sem hábitos ainda.</p>';
@@ -983,7 +1075,7 @@ function faceRow(cur,fn){return FACES.map((f,i)=>`<button class="face ${cur===i+
 
 function dayCompletionPct(date){
   const d=new Date(date+'T00:00');const end=d.getTime()+86399999;
-  const sched=state.habits.filter(h=>isScheduled(h,d)&&habitCreatedMs(h)<=end);
+  const sched=state.habits.filter(h=>isScheduled(h,d)&&habitCreatedMs(h)<=end&&!isAvoid(h));
   const active=sched.filter(h=>!isSkipped(h.id,date));
   if(!active.length)return null;
   return active.filter(h=>isDone(h.id,date)).length/active.length;
@@ -1227,7 +1319,7 @@ function delHabit(id){
 }
 
 // ADD/EDIT MODAL
-let selEmoji=EMOJIS[0],selColor=COLORS[0],selDays=[0,1,2,3,4,5,6],selType='simple',editingId=null;
+let selEmoji=EMOJIS[0],selColor=COLORS[0],selDays=[0,1,2,3,4,5,6],selType='simple',selPriority=1,selPolarity='good',editingId=null;
 const overlay=document.getElementById('overlay');
 function buildPickers(){
   document.getElementById('emojiRow').innerHTML=EMOJIS.map(e=>`<button class="emoji-pick ${e===selEmoji?'sel':''}" data-e="${e}">${e}</button>`).join('');
@@ -1252,10 +1344,22 @@ function buildPickers(){
     if(selDays.length===0)selDays=[d];
     buildPickers();
   });
+  // Objetivo (construir/evitar) + Prioridade
+  const av=selPolarity==='avoid';
+  document.querySelectorAll('.pol-pick').forEach(b=>{b.classList.toggle('sel',b.dataset.pol===selPolarity);
+    b.onclick=()=>{selPolarity=b.dataset.pol;if(selPolarity==='avoid')selType='simple';buildPickers()}});
+  document.querySelectorAll('.prio-pick').forEach(b=>{b.classList.toggle('sel',+b.dataset.prio===selPriority);
+    b.onclick=()=>{selPriority=+b.dataset.prio;buildPickers()}});
+  const hint=document.getElementById('polHint');
+  if(hint)hint.textContent=av?'Hábito a evitar. Registrar desvio tira XP (−'+(selPriority*10)+'); resistir o dia todo dá bônus (+'+(selPriority*5)+').':'Hábito a construir. Concluir rende +'+(selPriority*10)+' XP.';
+  const plbl=document.getElementById('prioLbl');
+  if(plbl)plbl.textContent=av?'(desvio −'+(selPriority*10)+' / resistir +'+(selPriority*5)+')':'(+'+(selPriority*10)+' XP)';
+  const tf=document.getElementById('typeField');
+  if(tf)tf.style.display=av?'none':'';
 }
 function openSheet(){
   editingId=null;
-  selEmoji=EMOJIS[0];selColor=COLORS[0];selDays=[0,1,2,3,4,5,6];selType='simple';
+  selEmoji=EMOJIS[0];selColor=COLORS[0];selDays=[0,1,2,3,4,5,6];selType='simple';selPriority=1;selPolarity='good';
   document.getElementById('sheetTitle').textContent='Novo hábito';
   document.getElementById('saveBtn').textContent='Salvar hábito';
   document.getElementById('hName').value='';
@@ -1266,7 +1370,7 @@ function openSheet(){
 function editHabit(id){
   const h=state.habits.find(x=>x.id===id);if(!h)return;
   editingId=id;
-  selEmoji=h.emoji;selColor=h.color;selDays=(h.days||[0,1,2,3,4,5,6]).slice();selType=h.type||'simple';
+  selEmoji=h.emoji;selColor=h.color;selDays=(h.days||[0,1,2,3,4,5,6]).slice();selType=h.type||'simple';selPriority=h.priority||1;selPolarity=h.polarity||'good';
   document.getElementById('sheetTitle').textContent='Editar hábito';
   document.getElementById('saveBtn').textContent='Salvar alterações';
   document.getElementById('hName').value=h.name;
@@ -1285,12 +1389,13 @@ document.getElementById('saveBtn').onclick=()=>{
     const h=state.habits.find(x=>x.id===editingId);
     if(h){
       h.name=name;h.emoji=selEmoji;h.color=selColor;h.days=selDays.slice();h.type=selType;h.reminder=reminder;
-      if(selType==='media')h.mediaKind='book';else delete h.mediaKind;
+      h.priority=selPriority;h.polarity=selPolarity;
+      if(selType==='media'&&selPolarity!=='avoid')h.mediaKind='book';else delete h.mediaKind;
       delete h.freq;h.updatedAt=Date.now();
     }
   }else{
-    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType,reminder,updatedAt:Date.now()};
-    if(selType==='media')habit.mediaKind='book';
+    const habit={id:'h'+Date.now(),name,emoji:selEmoji,color:selColor,days:selDays.slice(),type:selType,priority:selPriority,polarity:selPolarity,reminder,updatedAt:Date.now()};
+    if(selType==='media'&&selPolarity!=='avoid')habit.mediaKind='book';
     state.habits.push(habit);
   }
   save();closeSheet();render();
@@ -1454,6 +1559,53 @@ function openDetail(idx){
   detailOverlay.classList.add('show');
 }
 function closeDetail(){detailOverlay.classList.remove('show')}
+// Detalhe de 30 dias por hábito (aba Progresso)
+function openHabitStat(id){
+  const h=state.habits.find(x=>x.id===id);if(!h)return;
+  const av=isAvoid(h);
+  let t=0,good=0,bad=0;
+  for(let i=0;i<30;i++){const dt=new Date();dt.setDate(dt.getDate()-i);const k=ymd(dt);
+    if(isScheduled(h,dt)&&habitCreatedMs(h)<=dt.getTime()+86399999){
+      if(av){t++;if(isSlipped(h.id,k))bad++;else good++;}
+      else if(!isSkipped(h.id,k)){t++;if(isDone(h.id,k))good++;else bad++;}}}
+  const p=t?Math.round(good/t*100):0;
+  let stk=0;const d=new Date();
+  for(let i=0;i<400;i++){const k=ymd(d);
+    if(isScheduled(h,d)&&habitCreatedMs(h)<=d.getTime()+86399999){
+      if(av){if(!isSlipped(h.id,k))stk++;else if(k!==todayKey())break;}
+      else{if(isSkipped(h.id,k)){}else if(isDone(h.id,k))stk++;else if(k!==todayKey())break;}
+    }
+    d.setDate(d.getDate()-1);
+  }
+  let cells='';
+  for(let i=29;i>=0;i--){const dt=new Date();dt.setDate(dt.getDate()-i);const k=ymd(dt);
+    let cls='hstat-cell';
+    if(!isScheduled(h,dt)||habitCreatedMs(h)>dt.getTime()+86399999)cls+=' na';
+    else if(av)cls+=isSlipped(h.id,k)?' slip':' ok';
+    else if(isSkipped(h.id,k))cls+=' skip';
+    else cls+=isDone(h.id,k)?' ok':' miss';
+    cells+=`<div class="${cls}" title="${k}"></div>`;
+  }
+  const stars='★'.repeat(h.priority||1);
+  document.getElementById('detailSheet').innerHTML=`
+    <h3>${esc(h.emoji)} ${esc(h.name)}</h3>
+    <p class="help" style="margin-bottom:14px">${av?'Contenção · evitar':'Hábito'} · <span style="color:var(--gold,#d4a843)">${stars}</span> · ${esc(formatDays(h.days))}</p>
+    <div class="hstat-grid">
+      <div class="hstat-c"><b>${p}%</b><span>${av?'contido (30d)':'adesão (30d)'}</span></div>
+      <div class="hstat-c"><b>${stk}</b><span>sequência atual</span></div>
+      <div class="hstat-c"><b>${good}</b><span>${av?'dias resistido':'concluído (30d)'}</span></div>
+      <div class="hstat-c ${bad?'bad':''}"><b>${bad}</b><span>${av?'desvios (30d)':'perdido (30d)'}</span></div>
+    </div>
+    <div class="hstat-heat-label">Últimos 30 dias</div>
+    <div class="hstat-heat">${cells}</div>
+    <div class="hstat-legend">${av?'<span class="hstat-cell ok"></span> resistido · <span class="hstat-cell slip"></span> desvio':'<span class="hstat-cell miss"></span> não feito · <span class="hstat-cell ok"></span> feito · <span class="hstat-cell skip"></span> pulado'}</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="action-btn" style="flex:1" onclick="closeDetail();editHabit('${h.id}')"><span class="ic">✎</span>Editar</button>
+      <button class="action-btn danger" style="flex:1" onclick="closeDetail();delHabit('${h.id}')"><span class="ic">✕</span>Excluir</button>
+    </div>
+    <button class="cancel-btn" onclick="closeDetail()">Fechar</button>`;
+  detailOverlay.classList.add('show');
+}
 function removeFinished(idx){
   if(!confirm('Remover esse livro da biblioteca? (não apaga o histórico de hábito)'))return;
   state.finished.splice(idx,1);save();closeDetail();render();
@@ -1485,14 +1637,14 @@ function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==
 function sig(s){const c=JSON.parse(JSON.stringify(s||{}));delete c.updatedAt;return JSON.stringify(sortKeys(c))}
 function mergeStates(a,b){
   a=a||{};b=b||{};
-  const out={habits:[],log:{},skipped:{},current:{},finished:[],tombstones:{},daily:{},events:{},theme:'jardim',_themeTs:0,updatedAt:0};
+  const out={habits:[],log:{},skipped:{},slips:{},current:{},finished:[],tombstones:{},daily:{},events:{},theme:'jardim',_themeTs:0,updatedAt:0};
   const tomb={};
   [a,b].forEach(s=>{const t=s.tombstones||{};for(const id in t)tomb[id]=Math.max(tomb[id]||0,t[id])});
   const hmap={};
   [a,b].forEach(s=>(s.habits||[]).forEach(h=>{const ex=hmap[h.id];if(!ex||(h.updatedAt||0)>(ex.updatedAt||0))hmap[h.id]=h}));
   for(const id in hmap){const h=hmap[id];if((tomb[id]||0)>(h.updatedAt||0))continue;out.habits.push(h)}
   out.tombstones=tomb;
-  ['log','skipped'].forEach(key=>{const m={};[a,b].forEach(s=>{const o=s[key]||{};for(const day in o){const set=new Set(m[day]||[]);(o[day]||[]).forEach(x=>set.add(x));m[day]=[...set]}});out[key]=m});
+  ['log','skipped','slips'].forEach(key=>{const m={};[a,b].forEach(s=>{const o=s[key]||{};for(const day in o){const set=new Set(m[day]||[]);(o[day]||[]).forEach(x=>set.add(x));m[day]=[...set]}});out[key]=m});
   const cmap={};
   [a,b].forEach(s=>{const c=s.current||{};for(const hid in c){const bk=c[hid];const ex=cmap[hid];if(!ex||(bk._ts||0)>(ex._ts||0))cmap[hid]=bk}});
   out.current=cmap;
